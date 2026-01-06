@@ -62,7 +62,7 @@ function M.show_assigned_issues(host_name)
   local buf, win = open_float_win()
 
   local lines = {}
-  table.insert(lines, string.format('%-10s %-15s %-20s %-20s %-50s %-20s', 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
+  table.insert(lines, string.format('%-2s %-10s %-15s %-20s %-20s %-50s %-20s', '', 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
   for _, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
     local status = issue.status.name
@@ -70,7 +70,7 @@ function M.show_assigned_issues(host_name)
     local category = issue.category.name
     local summary = issue.summary
     local updated = parse_iso_date(issue.updated_at)
-    table.insert(lines, string.format('%-10s %-15s %-20s %-20s %-50s %-20s', id, status, project, category, summary, updated))
+    table.insert(lines, string.format('%-2s %-10s %-15s %-20s %-20s %-50s %-20s', '■', id, status, project, category, summary, updated))
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 2, 0 })
@@ -84,14 +84,14 @@ function M.show_assigned_issues(host_name)
 
       if not defined_highlights[group_name] then
         local cterm_color = util.hex_to_cterm(color)
-        vim.api.nvim_set_hl(0, group_name, { guibg = color, ctermbg = cterm_color })
+        vim.api.nvim_set_hl(0, group_name, { fg = color, ctermfg = cterm_color })
         defined_highlights[group_name] = true
       end
 
-      -- Highlight the status text
+      -- Highlight the box character
       -- The line number is i, because the header is at line 0, and issues start at line 1
-      -- The status column starts at character 11 and has a length of 15
-      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i, 11, 26)
+      -- The box column starts at character 0 and has a length of 1
+      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i, 0, 1)
     end
   end
 
