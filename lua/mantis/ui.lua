@@ -149,7 +149,7 @@ function M.show_assigned_issues(host_name, view_mode)
   local severity_width = 8
   local status_width = 15
   local project_category_width = 30 -- Combined project and category
-  local updated_width = 15
+  local updated_width = 16
 
   -- Calculate padding spaces (6 columns, 6 * 2 spaces)
   local padding_width = 12
