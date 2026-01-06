@@ -105,7 +105,7 @@ function M.show_assigned_issues(host_name)
   table.insert(lines, string.rep('─', win_width))
   for _, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
-    local status = '■ ' .. issue.status.name
+    local status = issue.status.name
     local project = issue.project.name
     local category = issue.category.name
     local summary = issue.summary
@@ -114,27 +114,6 @@ function M.show_assigned_issues(host_name)
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
-
-  local defined_highlights = {}
-
-  for i, issue in ipairs(M.issues) do
-    if issue.status and issue.status.color then
-      local color = issue.status.color
-      local group_name = 'MantisStatus_' .. color:sub(2)
-
-      if not defined_highlights[group_name] then
-        local cterm_color = util.hex_to_cterm(color)
-        vim.api.nvim_set_hl(0, group_name, { fg = color, ctermfg = cterm_color })
-        defined_highlights[group_name] = true
-      end
-
-      -- Highlight the box character in the status column
-      -- ID width (11) + padding (2) = 13
-      local status_col_start = id_width + 2
-      -- The line number is i + 3, because of the title, empty line, header and border
-      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 3, status_col_start, status_col_start + 1)
-    end
-  end
 
   -- Key mappings
   vim.api.nvim_buf_set_keymap(buf, 'n', 'j', 'j', { noremap = true, silent = true })
