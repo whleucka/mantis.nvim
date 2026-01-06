@@ -2,8 +2,8 @@
 local M = {}
 
 M.options = {
-  default_host = nil,
   hosts = {},
+  verbose = false,
 }
 
 function M.setup(options)
@@ -14,9 +14,7 @@ function M.get(host_name)
   if host_name then
     return M.options.hosts[host_name]
   end
-  if M.options.default_host then
-    return M.options.hosts[M.options.default_host]
-  end
+
   -- Backwards compatibility
   if M.options.url then
     return {
@@ -25,6 +23,10 @@ function M.get(host_name)
     }
   end
   return nil
+end
+
+function M.get_hosts()
+  return M.options.hosts
 end
 
 return M
