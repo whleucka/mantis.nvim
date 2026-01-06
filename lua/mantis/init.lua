@@ -42,6 +42,15 @@ function M:call_api(endpoint, method, data)
     opts.body = vim.fn.json_encode(data)
   end
 
+  if config.options.verbose then
+    print('Mantis API Request:')
+    print('URL: ' .. url)
+    print('Method: ' .. method)
+    if data then
+      print('Data: ' .. opts.body)
+    end
+  end
+
   local response
   if method == 'GET' then
     response = curl.get(url, opts)
@@ -56,8 +65,19 @@ function M:call_api(endpoint, method, data)
     return nil
   end
 
+  if config.options.verbose then
+    print('Mantis API Response:')
+    print('Status: ' .. response.status)
+    print('Body: ' .. response.body)
+  end
+
   if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
-    vim.notify('Mantis API Error: ' .. response.body, vim.log.levels.ERROR)
+    local error_message = response.body
+    local decoded_body, _ = vim.fn.json_decode(response.body)
+    if decoded_body and decoded_body.message then
+      error_message = decoded_body.message
+    end
+    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
     return nil
   end
 
