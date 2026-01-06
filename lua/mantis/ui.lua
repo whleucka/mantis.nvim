@@ -139,7 +139,7 @@ function M.show_assigned_issues(host_name)
   table.insert(lines, '')
 
   -- Keymap help area
-  local keymap_help_text = "r: Refresh View"
+  local keymap_help_text = "r: Refresh View | q: Quit"
   local keymap_padding = math.floor((win_width - #keymap_help_text) / 2)
   table.insert(lines, string.rep(' ', keymap_padding) .. keymap_help_text)
 
