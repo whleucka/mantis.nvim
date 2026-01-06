@@ -45,6 +45,23 @@ local function open_float_win()
   return buf, win
 end
 
+local function display_message(buf, win, message, is_error)
+  local win_width = vim.api.nvim_win_get_width(win)
+  local centered_message = string.rep(' ', math.floor((win_width - #message) / 2)) .. message
+  local lines = {
+    centered_message
+  }
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  vim.api.nvim_win_set_cursor(win, { 1, 0 }) -- Set cursor to the message line
+
+  -- Define highlight for message
+  vim.api.nvim_set_hl(0, 'MantisMessage', { italic = true, fg = is_error and '#FF0000' or '#888888', ctermfg = is_error and util.hex_to_cterm('#FF0000') or util.hex_to_cterm('#888888') })
+  vim.api.nvim_buf_add_highlight(buf, -1, 'MantisMessage', 0, 0, -1)
+
+  -- Key mappings (only q to close)
+  vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>', { noremap = true, silent = true })
+end
+
 M.current_host = nil
 
 function M.show_assigned_issues(host_name)
@@ -52,17 +69,19 @@ function M.show_assigned_issues(host_name)
 
   local client = mantis.new(host_name)
   if not client then
+    local buf, win = open_float_win()
+    display_message(buf, win, "An error occurred. Check mantis config.", true)
     return
   end
-  -- For now we get my assigned issues, we can add more options later
+
   local issues_data = client:get_my_assigned_issues()
   if not issues_data or not issues_data.issues or #issues_data.issues == 0 then
-    vim.notify('No assigned issues found for host: ' .. host_name, vim.log.levels.INFO)
+    local buf, win = open_float_win()
+    display_message(buf, win, "No issues assigned to you.", false)
     return
   end
 
   M.issues = issues_data.issues
-
   local buf, win = open_float_win()
 
   local win_width = vim.api.nvim_win_get_width(win)
@@ -112,8 +131,26 @@ function M.show_assigned_issues(host_name)
     local updated = parse_iso_date(issue.updated_at)
     table.insert(lines, string.format(format_string, id, status, project, category, summary, updated))
   end
+
+  -- Separator below issues
+  table.insert(lines, string.rep('─', win_width))
+
+  -- Empty line
+  table.insert(lines, '')
+
+  -- Keymap help area
+  local keymap_help_text = "r: Refresh View"
+  local keymap_padding = math.floor((win_width - #keymap_help_text) / 2)
+  table.insert(lines, string.rep(' ', keymap_padding) .. keymap_help_text)
+
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
+  vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line (first issue)
+
+  -- Define highlight for keymap help
+  vim.api.nvim_set_hl(0, 'MantisKeymapHelp', { fg = '#888888', ctermfg = util.hex_to_cterm('#888888') })
+  -- Apply highlight to keymap help line
+  vim.api.nvim_buf_add_highlight(buf, -1, 'MantisKeymapHelp', #lines - 1, 0, -1)
+
 
   local defined_highlights = {}
 
@@ -145,13 +182,22 @@ function M.show_assigned_issues(host_name)
   end
 
   -- Key mappings
-  vim.api.nvim_buf_set_keymap(buf, 'n', 'j', 'j', { noremap = true, silent = true })
+  vim.api.nvim_buf_set_keymap(buf, 'n', 'j', '', {
+    noremap = true,
+    silent = true,
+    callback = function()
+      local cursor = vim.api.nvim_win_get_cursor(0)
+      if cursor[1] < #M.issues + 4 then -- check if cursor is before last issue
+        vim.api.nvim_win_set_cursor(0, { cursor[1] + 1, cursor[2] })
+      end
+    end,
+  })
   vim.api.nvim_buf_set_keymap(buf, 'n', 'k', '', {
     noremap = true,
     silent = true,
     callback = function()
       local cursor = vim.api.nvim_win_get_cursor(0)
-      if cursor[1] > 5 then
+      if cursor[1] > 5 then -- check if cursor is after first issue (line 5)
         vim.api.nvim_win_set_cursor(0, { cursor[1] - 1, cursor[2] })
       end
     end,
