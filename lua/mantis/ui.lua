@@ -5,7 +5,6 @@ local mantis = require('mantis')
 local config = require('mantis.config')
 local util = require('mantis.util')
 
-local ns_id = vim.api.nvim_create_namespace('mantis_ui')
 M.issues = {}
 
 local function parse_iso_date(iso_date)
@@ -65,7 +64,6 @@ function M.show_assigned_issues(host_name)
   M.issues = issues_data.issues
 
   local buf, win = open_float_win()
-  vim.api.nvim_buf_clear_namespace(buf, ns_id, 0, -1)
 
   local win_width = vim.api.nvim_win_get_width(win)
 
@@ -105,13 +103,14 @@ function M.show_assigned_issues(host_name)
   table.insert(lines, '') -- Empty line
   table.insert(lines, string.format(format_string, 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
   table.insert(lines, string.rep('─', win_width))
-  for _, issue in ipairs(M.issues) do
+  for idx, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
+    local status = issue.status.name
     local project = issue.project.name
     local category = issue.category.name
     local summary = issue.summary
     local updated = parse_iso_date(issue.updated_at)
-    table.insert(lines, string.format(format_string, id, '', project, category, summary, updated))
+    table.insert(lines, string.format(format_string, id, status, project, category, summary, updated))
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
@@ -125,17 +124,17 @@ function M.show_assigned_issues(host_name)
 
       if not defined_highlights[group_name] then
         local cterm_color = util.hex_to_cterm(color)
-        vim.api.nvim_set_hl(0, group_name, { fg = color, ctermfg = cterm_color })
+        vim.api.nvim_set_hl(0, group_name, { bg = color, ctermbg = cterm_color })
         defined_highlights[group_name] = true
       end
 
-      -- Add status as virtual text
-      local line_nr = i + 3 -- line number in buffer (0-indexed)
+      -- Highlight the status text
+      -- Line number is i + 3
+      -- Status column starts after ID (id_width = 11) and 2 spaces padding, so at column 13
+      -- Status width is status_width (18)
       local status_col_start = id_width + 2
-      local status_text = issue.status.name
-      vim.api.nvim_buf_set_extmark(buf, ns_id, line_nr, status_col_start, {
-        virt_text = {{'■ ', group_name}, {status_text, 'Comment'}},
-      })
+      local status_col_end = status_col_start + status_width
+      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 3, status_col_start, status_col_end)
     end
   end
 
