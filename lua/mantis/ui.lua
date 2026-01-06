@@ -68,18 +68,17 @@ function M.show_assigned_issues(host_name)
   local win_width = vim.api.nvim_win_get_width(win)
 
   -- Define fixed column widths (without padding)
-  local box_width = 2
   local id_width = 11
-  local status_width = 16
+  local status_width = 18 -- Increased to accommodate the box
   local project_width = 21
   local category_width = 21
   local updated_width = 20
 
-  -- Calculate padding spaces (6 columns, 5 * 2 spaces)
-  local padding_width = 10
+  -- Calculate padding spaces (5 columns, 4 * 2 spaces)
+  local padding_width = 8
 
   -- Calculate width of fixed columns
-  local fixed_content_width = box_width + id_width + status_width + project_width + category_width + updated_width
+  local fixed_content_width = id_width + status_width + project_width + category_width + updated_width
 
   -- Calculate summary width
   local summary_width = win_width - fixed_content_width - padding_width
@@ -88,7 +87,6 @@ function M.show_assigned_issues(host_name)
 
   -- Create format string with padding
   local format_specifiers = {
-    string.format('%%-%ds', box_width),
     string.format('%%%ds', id_width),
     string.format('%%-%ds', status_width),
     string.format('%%-%ds', project_width),
@@ -103,16 +101,16 @@ function M.show_assigned_issues(host_name)
   local padding = math.floor((win_width - #title) / 2)
   table.insert(lines, string.rep(' ', padding) .. title)
   table.insert(lines, '') -- Empty line
-  table.insert(lines, string.format(format_string, '', 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
+  table.insert(lines, string.format(format_string, 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
   table.insert(lines, string.rep('─', win_width))
   for _, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
-    local status = issue.status.name
+    local status = '■ ' .. issue.status.name
     local project = issue.project.name
     local category = issue.category.name
     local summary = issue.summary
     local updated = parse_iso_date(issue.updated_at)
-    table.insert(lines, string.format(format_string, '■', id, status, project, category, summary, updated))
+    table.insert(lines, string.format(format_string, id, status, project, category, summary, updated))
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
@@ -130,9 +128,11 @@ function M.show_assigned_issues(host_name)
         defined_highlights[group_name] = true
       end
 
-      -- Highlight the box character
+      -- Highlight the box character in the status column
+      -- ID width (11) + padding (2) = 13
+      local status_col_start = id_width + 2
       -- The line number is i + 3, because of the title, empty line, header and border
-      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 3, 0, 1)
+      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 3, status_col_start, status_col_start + 1)
     end
   end
 
