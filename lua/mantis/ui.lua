@@ -124,7 +124,13 @@ function M.show_assigned_issues(host_name)
 
       if not defined_highlights[group_name] then
         local cterm_color = util.hex_to_cterm(color)
-        vim.api.nvim_set_hl(0, group_name, { bg = color, ctermbg = cterm_color })
+
+        local r, g, b = util.hex_to_rgb(color)
+        local luminance = util.get_luminance(r, g, b)
+        local fg_color = (luminance > 0.179) and '#000000' or '#FFFFFF' -- 0.179 is WCAG 2.0 contrast ratio for 3:1 (AA for large text)
+        local cterm_fg_color = (luminance > 0.179) and util.hex_to_cterm('#000000') or util.hex_to_cterm('#FFFFFF')
+
+        vim.api.nvim_set_hl(0, group_name, { bg = color, ctermbg = cterm_color, fg = fg_color, ctermfg = cterm_fg_color })
         defined_highlights[group_name] = true
       end
 
