@@ -1,4 +1,3 @@
--- Mantis.nvim UI
 local M = {}
 
 local mantis = require('mantis')
@@ -81,7 +80,7 @@ function M.show_assigned_issues(host_name)
 
   local issues_data = client:get_my_assigned_issues()
   if not issues_data or not issues_data.issues or #issues_data.issues == 0 then
-    display_message("No issues assigned to you.", false)
+    display_message("No issues found 🎉", false)
     return
   end
 
@@ -126,8 +125,9 @@ function M.show_assigned_issues(host_name)
   local title = 'Mantis Issues [' .. host_name .. ']'
   local padding = math.floor((win_width - #title) / 2)
   table.insert(lines, string.rep(' ', padding) .. title)
-  table.insert(lines, '') -- Empty line
-  table.insert(lines, string.format(format_string, 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
+  table.insert(lines, '')
+  table.insert(lines, '')
+  table.insert(lines, string.format(format_string, 'ID', 'STATUS', 'PROJECT', 'CATEGORY', 'SUMMARY', 'UPDATED'))
   table.insert(lines, string.rep('─', win_width))
   for idx, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
@@ -154,7 +154,7 @@ function M.show_assigned_issues(host_name)
   table.insert(lines, string.rep(' ', keymap_padding) .. keymap_help_text)
 
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line (first issue)
+  vim.api.nvim_win_set_cursor(win, { 6, 0 }) -- Cursor starts at nth line (first issue)
 
   -- Define highlight for keymap help
   vim.api.nvim_set_hl(0, 'MantisKeymapHelp', { fg = '#888888', ctermfg = util.hex_to_cterm('#888888') })

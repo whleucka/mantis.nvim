@@ -1,7 +1,6 @@
--- Mantis.nvim Utilities
 local M = {}
 
--- Taken from https://gist.github.com/dexpota/24f11a2579b2a52331525180016a2441
+-- From https://gist.github.com/dexpota/24f11a2579b2a52331525180016a2441
 function M.hex_to_cterm(hex)
   local hex = hex:gsub("#", "")
   local r = tonumber("0x" .. hex:sub(1, 2)) / 255
