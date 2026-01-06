@@ -27,7 +27,7 @@ end
 function M:call_api(endpoint, method, data)
   method = method or 'GET'
   local headers = {
-    ['Authorization'] = "Bearer " .. self.token,
+    ['Authorization'] = self.token,
     ['Content-Type'] = 'application/json',
   }
 
@@ -72,10 +72,14 @@ function M:call_api(endpoint, method, data)
   end
 
   if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
-    local error_message = response.body
-    local decoded_body, _ = vim.fn.json_decode(response.body)
-    if decoded_body and decoded_body.message then
-      error_message = decoded_body.message
+    local error_message = "Mantis API Error"
+    if response.body and response.body ~= "" then
+        local decoded_body, _ = pcall(vim.fn.json_decode, response.body)
+        if decoded_body and decoded_body.message then
+          error_message = decoded_body.message
+        else
+          error_message = response.body
+        end
     end
     vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
     return nil
