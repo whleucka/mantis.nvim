@@ -3,6 +3,7 @@ local M = {}
 
 local mantis = require('mantis')
 local config = require('mantis.config')
+local util = require('mantis.util')
 
 M.issues = {}
 
@@ -73,6 +74,26 @@ function M.show_assigned_issues(host_name)
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 2, 0 })
+
+  local defined_highlights = {}
+
+  for i, issue in ipairs(M.issues) do
+    if issue.status and issue.status.color then
+      local color = issue.status.color
+      local group_name = 'MantisStatus_' .. color:sub(2)
+
+      if not defined_highlights[group_name] then
+        local cterm_color = util.hex_to_cterm(color)
+        vim.api.nvim_set_hl(0, group_name, { guibg = color, ctermbg = cterm_color })
+        defined_highlights[group_name] = true
+      end
+
+      -- Highlight the status text
+      -- The line number is i, because the header is at line 0, and issues start at line 1
+      -- The status column starts at character 11 and has a length of 15
+      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i, 11, 26)
+    end
+  end
 
   -- Key mappings
   vim.api.nvim_buf_set_keymap(buf, 'n', 'j', 'j', { noremap = true, silent = true })
