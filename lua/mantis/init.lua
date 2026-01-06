@@ -4,11 +4,23 @@ local M = {}
 local config = require('mantis.config')
 local curl = require('plenary.curl')
 
-function M.new(url, token)
+function M.new(host_name)
+  local host_config = config.get(host_name)
+  if not host_config then
+    vim.notify('Mantis: Host "' .. (host_name or 'default') .. '" not configured.', vim.log.levels.ERROR)
+    return nil
+  end
+
   local instance = {
-    url = url or config.get().url,
-    token = token or os.getenv('MANTIS_API_TOKEN') or config.get().token,
+    url = host_config.url,
+    token = host_config.token or os.getenv('MANTIS_API_TOKEN'),
   }
+
+  if not instance.url or not instance.token then
+    vim.notify('Mantis: URL or token not configured for host "' .. (host_name or 'default') .. '".', vim.log.levels.ERROR)
+    return nil
+  end
+
   return setmetatable(instance, { __index = M })
 end
 
@@ -137,6 +149,20 @@ end
 
 function M:add_issue_relationship(issue_id, data)
   return self:call_api('issues/' .. issue_id .. '/relationships/', 'POST', data)
+end
+
+function M.setup_ui()
+  local ui = require('mantis.ui')
+  vim.api.nvim_create_user_command('Mantis', function()
+    ui.select_host()
+  end, {
+    desc = 'Open Mantis UI',
+  })
+end
+
+function M.setup(user_opts)
+  require("mantis.config").setup(user_opts)
+  M.setup_ui()
 end
 
 return M
