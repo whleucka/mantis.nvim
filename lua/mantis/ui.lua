@@ -19,12 +19,15 @@ local function parse_iso_date(iso_date)
 end
 
 
-local function open_float_win()
+local function open_float_win(content_height)
   local width = vim.api.nvim_get_option('columns')
   local height = vim.api.nvim_get_option('lines')
 
   local win_width = math.floor(width * 0.9)
-  local win_height = math.floor(height * 0.9)
+
+  -- Dynamic height calculation
+  local max_height = math.floor(height * 0.8)
+  local win_height = math.min(content_height, max_height)
 
   local row = math.floor((height - win_height) / 2)
   local col = math.floor((width - win_width) / 2)
@@ -45,18 +48,21 @@ local function open_float_win()
   return buf, win
 end
 
-local function display_message(buf, win, message, is_error)
+local function display_message(message, is_error)
+  local buf, win = open_float_win(3) -- 3 lines for the message
   local win_width = vim.api.nvim_win_get_width(win)
   local centered_message = string.rep(' ', math.floor((win_width - #message) / 2)) .. message
   local lines = {
-    centered_message
+    '', -- Empty line for padding
+    centered_message,
+    '', -- Empty line for padding
   }
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_win_set_cursor(win, { 1, 0 }) -- Set cursor to the message line
+  vim.api.nvim_win_set_cursor(win, { 2, 0 }) -- Set cursor to the message line
 
   -- Define highlight for message
   vim.api.nvim_set_hl(0, 'MantisMessage', { italic = true, fg = is_error and '#FF0000' or '#888888', ctermfg = is_error and util.hex_to_cterm('#FF0000') or util.hex_to_cterm('#888888') })
-  vim.api.nvim_buf_add_highlight(buf, -1, 'MantisMessage', 0, 0, -1)
+  vim.api.nvim_buf_add_highlight(buf, -1, 'MantisMessage', 1, 0, -1)
 
   -- Key mappings (only q to close)
   vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>', { noremap = true, silent = true })
@@ -69,20 +75,21 @@ function M.show_assigned_issues(host_name)
 
   local client = mantis.new(host_name)
   if not client then
-    local buf, win = open_float_win()
-    display_message(buf, win, "An error occurred. Check mantis config.", true)
+    display_message("An error occurred. Check mantis config.", true)
     return
   end
 
   local issues_data = client:get_my_assigned_issues()
   if not issues_data or not issues_data.issues or #issues_data.issues == 0 then
-    local buf, win = open_float_win()
-    display_message(buf, win, "No issues assigned to you.", false)
+    display_message("No issues assigned to you.", false)
     return
   end
 
   M.issues = issues_data.issues
-  local buf, win = open_float_win()
+  -- Calculate required height
+  -- title, empty, header, border, separator, empty, keymap_help, top/bottom border
+  local content_lines = 8 + #M.issues
+  local buf, win = open_float_win(content_lines)
 
   local win_width = vim.api.nvim_win_get_width(win)
 
