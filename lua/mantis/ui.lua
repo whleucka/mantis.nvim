@@ -135,6 +135,9 @@ function M.show_assigned_issues(host_name)
     local project = issue.project.name
     local category = issue.category.name
     local summary = issue.summary
+    if #summary > summary_width then
+      summary = summary:sub(1, summary_width - 3) .. '...'
+    end
     local updated = parse_iso_date(issue.updated_at)
     table.insert(lines, string.format(format_string, id, status, project, category, summary, updated))
   end
