@@ -5,6 +5,7 @@ local mantis = require('mantis')
 local config = require('mantis.config')
 local util = require('mantis.util')
 
+local ns_id = vim.api.nvim_create_namespace('mantis_ui')
 M.issues = {}
 
 local function parse_iso_date(iso_date)
@@ -64,6 +65,7 @@ function M.show_assigned_issues(host_name)
   M.issues = issues_data.issues
 
   local buf, win = open_float_win()
+  vim.api.nvim_buf_clear_namespace(buf, ns_id, 0, -1)
 
   local win_width = vim.api.nvim_win_get_width(win)
 
@@ -105,15 +107,37 @@ function M.show_assigned_issues(host_name)
   table.insert(lines, string.rep('─', win_width))
   for _, issue in ipairs(M.issues) do
     local id = tostring(issue.id)
-    local status = issue.status.name
     local project = issue.project.name
     local category = issue.category.name
     local summary = issue.summary
     local updated = parse_iso_date(issue.updated_at)
-    table.insert(lines, string.format(format_string, id, status, project, category, summary, updated))
+    table.insert(lines, string.format(format_string, id, '', project, category, summary, updated))
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
   vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
+
+  local defined_highlights = {}
+
+  for i, issue in ipairs(M.issues) do
+    if issue.status and issue.status.color then
+      local color = issue.status.color
+      local group_name = 'MantisStatus_' .. color:sub(2)
+
+      if not defined_highlights[group_name] then
+        local cterm_color = util.hex_to_cterm(color)
+        vim.api.nvim_set_hl(0, group_name, { fg = color, ctermfg = cterm_color })
+        defined_highlights[group_name] = true
+      end
+
+      -- Add status as virtual text
+      local line_nr = i + 3 -- line number in buffer (0-indexed)
+      local status_col_start = id_width + 2
+      local status_text = issue.status.name
+      vim.api.nvim_buf_set_extmark(buf, ns_id, line_nr, status_col_start, {
+        virt_text = {{'■ ', group_name}, {status_text, 'Comment'}},
+      })
+    end
+  end
 
   -- Key mappings
   vim.api.nvim_buf_set_keymap(buf, 'n', 'j', 'j', { noremap = true, silent = true })
