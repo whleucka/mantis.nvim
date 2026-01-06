@@ -7,6 +7,9 @@ local config = require('mantis.config')
 local util = require('mantis.util')
 
 M.issues = {}
+M.active_view = "assigned"
+M.current_buf = nil
+M.current_win = nil
 
 local function parse_iso_date(iso_date)
   if not iso_date then return '' end
@@ -24,27 +27,51 @@ local function open_float_win(content_height)
   local width = vim.o.columns
   local height = vim.o.lines
 
-  local win_width = math.floor(width * 0.7)
-
-  -- Dynamic height calculation
+  local win_width = math.floor(width * 0.85) -- Assuming this is the desired width
   local max_height = math.floor(height * 0.8)
   local win_height = math.min(content_height, max_height)
 
   local row = math.floor((height - win_height) / 2)
   local col = math.floor((width - win_width) / 2)
 
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[buf].bufhidden = 'wipe'
-  local win = vim.api.nvim_open_win(buf, true, {
-    relative = 'editor',
-    width = win_width,
-    height = win_height,
-    row = row,
-    col = col,
-    style = 'minimal',
-    border = 'single',
-  })
-  vim.wo[win].cursorline = true
+  local buf, win
+
+  if M.current_buf and vim.api.nvim_buf_is_valid(M.current_buf) and
+     M.current_win and vim.api.nvim_win_is_valid(M.current_win) then
+    -- Reuse existing window and buffer
+    buf = M.current_buf
+    win = M.current_win
+
+    -- Clear buffer
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, {})
+
+    -- Resize and reposition the window
+    vim.api.nvim_win_set_config(win, {
+      relative = 'editor',
+      width = win_width,
+      height = win_height,
+      row = row,
+      col = col,
+    })
+  else
+    -- Create new window and buffer
+    buf = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].bufhidden = 'wipe'
+    win = vim.api.nvim_open_win(buf, true, {
+      relative = 'editor',
+      width = win_width,
+      height = win_height,
+      row = row,
+      col = col,
+      style = 'minimal',
+      border = 'rounded',
+    })
+    vim.wo[win].cursorline = true
+
+    -- Store them for future reuse
+    M.current_buf = buf
+    M.current_win = win
+  end
 
   return buf, win
 end
@@ -70,14 +97,20 @@ local function display_message(message, is_error)
   -- Define highlight for dimmer text
   vim.api.nvim_set_hl(0, 'MantisDimText', { fg = '#666666', ctermfg = util.hex_to_cterm('#666666') })
 
+  -- Define highlight for active button
+  vim.api.nvim_set_hl(0, 'MantisActiveButton', { bold = true, fg = '#FFFFFF', ctermfg = util.hex_to_cterm('#FFFFFF'), bg = '#5F87AF', ctermbg = util.hex_to_cterm('#5F87AF') })
+
   -- Key mappings (only q to close)
   vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>', { noremap = true, silent = true })
 end
 
 M.current_host = nil
 
-function M.show_assigned_issues(host_name)
+function M.show_assigned_issues(host_name, view_mode)
+  view_mode = view_mode or "assigned"
   M.current_host = host_name -- Store the current host
+  M.active_view = view_mode -- Set the active view for highlighting
+  local extmarks_to_apply = {} -- Initialize extmarks_to_apply here
 
   local client = mantis.new(host_name)
   if not client then
@@ -85,7 +118,18 @@ function M.show_assigned_issues(host_name)
     return
   end
 
-  local issues_data = client:get_my_assigned_issues()
+  local issues_data
+  if view_mode == "assigned" then
+    issues_data = client:get_my_assigned_issues()
+  elseif view_mode == "all" then
+    -- Assuming get_all_issues exists in the client for now.
+    -- If not, it will return nil and fallback to assigned.
+    issues_data = client:get_all_issues()
+  else
+    -- Default fallback if view_mode is unexpected
+    issues_data = client:get_my_assigned_issues()
+  end
+
   if not issues_data or not issues_data.issues or #issues_data.issues == 0 then
     display_message("No issues found 🎉", false)
     return
@@ -94,23 +138,22 @@ function M.show_assigned_issues(host_name)
   M.issues = issues_data.issues
   -- Calculate required height
   -- title, empty, header, border, separator, empty, keymap_help, top/bottom border
-  local content_lines = 9 + #M.issues
+  local content_lines = 8 + #M.issues
   local buf, win = open_float_win(content_lines)
 
   local win_width = vim.api.nvim_win_get_width(win)
 
   -- Define fixed column widths (without padding)
   local id_width = 11
-  local status_width = 18 -- Increased to accommodate the box
-  local project_width = 21
-  local category_width = 21
+  local status_width = 25
+  local project_category_width = 45 -- Combined project and category
   local updated_width = 20
 
-  -- Calculate padding spaces (5 columns, 4 * 2 spaces)
-  local padding_width = 10
+  -- Calculate padding spaces (4 columns, 4 * 2 spaces)
+  local padding_width = 8
 
   -- Calculate width of fixed columns
-  local fixed_content_width = id_width + status_width + project_width + category_width + updated_width
+  local fixed_content_width = id_width + status_width + project_category_width + updated_width
 
   -- Calculate summary width
   local summary_width = win_width - fixed_content_width - padding_width
@@ -121,39 +164,45 @@ function M.show_assigned_issues(host_name)
   local format_specifiers = {
     string.format('%%%ds', id_width),
     string.format('%%-%ds', status_width),
-    string.format('%%-%ds', project_width),
-    string.format('%%-%ds', category_width),
+    string.format('%%-%ds', project_category_width), -- Combined project and category
     string.format('%%-%ds', summary_width),
     string.format('%%%ds', updated_width),
   }
   local format_string = table.concat(format_specifiers, '  ')
 
   local lines = {}
-  local title = 'Mantis Issues [' .. host_name .. ']'
+  local title = '🪲 Mantis Issues [' .. host_name .. ']'
   local padding = math.floor((win_width - #title) / 2)
   table.insert(lines, string.rep(' ', padding) .. title) -- Line 0
   table.insert(lines, '') -- Line 1 (empty)
+  table.insert(lines, string.format(format_string, 'ID', 'STATUS', 'PROJECT', 'SUMMARY', 'UPDATED')) -- Line 2 (header)
+  table.insert(lines, string.rep('─', win_width)) -- Line 3 (separator below header)
 
-  -- View mode buttons (Line 2)
-  local assigned_button = "[Assigned to me]"
-  local all_issues_button = "[All Issues]"
-  local buttons_line = assigned_button .. "  " .. all_issues_button -- Two spaces between buttons
-  local buttons_padding = math.floor((win_width - #buttons_line) / 2)
-  table.insert(lines, string.rep(' ', buttons_padding) .. buttons_line)
-
-  table.insert(lines, string.rep('─', win_width)) -- Separator below buttons (Line 3)
-
-  table.insert(lines, string.format(format_string, 'ID', 'STATUS', 'PROJECT', 'CATEGORY', 'SUMMARY', 'UPDATED')) -- Line 4 (header)
-  table.insert(lines, string.rep('─', win_width)) -- Line 5 (separator)
-
-  local extmarks_to_apply = {}
   local defined_highlights = {} -- Moved here, outside the loop
 
   for idx, issue in ipairs(M.issues) do
     local id_str = string.format('%' .. id_width .. 's', tostring(issue.id))
-    local status_str = string.format('%-' .. status_width .. 's', issue.status.name)
-    local project_str = string.format('%-' .. project_width .. 's', issue.project.name)
-    local category_str = string.format('%-' .. category_width .. 's', issue.category.name)
+    local status_display = issue.status.name
+    if issue.handler and issue.handler.name then
+      local handler_name = issue.handler.name
+      local current_length = #status_display
+      local required_space = #handler_name + 3 -- for " (" and ")"
+      if current_length + required_space > status_width then
+        -- Truncate handler_name if it causes overflow
+        local available_space = status_width - current_length - 3
+        if available_space > 0 then
+          handler_name = handler_name:sub(1, available_space)
+        else
+          handler_name = "" -- No space for handler name
+        end
+      end
+      if #handler_name > 0 then
+        status_display = status_display .. ' (' .. handler_name .. ')'
+      end
+    end
+    local status_str = string.format('%-' .. status_width .. 's', status_display)
+    local project_category_display = string.format('%s [%s]', issue.project.name, issue.category.name)
+    local project_category_str = string.format('%-' .. project_category_width .. 's', project_category_display)
     local summary_val = issue.summary
     if #summary_val > summary_width then
       summary_val = summary_val:sub(1, summary_width - 3) .. '...'
@@ -166,8 +215,7 @@ function M.show_assigned_issues(host_name)
     local full_line = table.concat({
       id_str,
       status_str,
-      project_str,
-      category_str,
+      project_category_str, -- Combined column
       summary_str,
       updated_str,
     }, '  ') -- Two spaces between columns
@@ -177,8 +225,7 @@ function M.show_assigned_issues(host_name)
     -- Store extmark details for MantisDimText (UPDATED column)
     local updated_col_start = #id_str + 2 + -- id_str + 2 spaces
                               #status_str + 2 + -- status_str + 2 spaces
-                              #project_str + 2 + -- project_str + 2 spaces
-                              #category_str + 2 + -- category_str + 2 spaces
+                              #project_category_str + 2 + -- combined column + 2 spaces
                               #summary_str + 2 -- summary_str + 2 spaces
     local updated_col_end = updated_col_start + #updated_str
 
@@ -215,14 +262,13 @@ function M.show_assigned_issues(host_name)
     end
   end
 
-  -- Separator below issues
-  table.insert(lines, string.rep('─', win_width))
+
 
   -- Empty line
   table.insert(lines, '')
 
   -- Keymap help area
-  local keymap_help_text = "r: Refresh View | q: Quit"
+  local keymap_help_text = "a: Assigned Issues | v: All Issues | q: Quit"
   local keymap_padding = math.floor((win_width - #keymap_help_text) / 2)
   table.insert(lines, string.rep(' ', keymap_padding) .. keymap_help_text)
 
@@ -251,7 +297,7 @@ function M.show_assigned_issues(host_name)
     callback = function()
       local cursor = vim.api.nvim_win_get_cursor(0)
       -- Cursor is 1-indexed for line, 0-indexed for col.
-      -- Issues start at line 5 (1-indexed). Total lines in the header is 4.
+      -- Issues start at line 5 (1-indexed). Total lines before first issue is 4.
       if cursor[1] < (#M.issues + 4) then -- check if cursor is before last issue
         vim.api.nvim_win_set_cursor(0, { cursor[1] + 1, cursor[2] })
       end
@@ -267,11 +313,23 @@ function M.show_assigned_issues(host_name)
       end
     end,
   })
-  vim.api.nvim_buf_set_keymap(buf, 'n', 'r', '', {
+
+  vim.api.nvim_buf_set_keymap(buf, 'n', 'a', '', {
     noremap = true,
     silent = true,
     callback = function()
-      M.show_assigned_issues(M.current_host)
+      if M.active_view ~= "assigned" then
+        M.show_assigned_issues(M.current_host, "assigned")
+      end
+    end,
+  })
+  vim.api.nvim_buf_set_keymap(buf, 'n', 'v', '', {
+    noremap = true,
+    silent = true,
+    callback = function()
+      if M.active_view ~= "all" then
+        M.show_assigned_issues(M.current_host, "all")
+      end
     end,
   })
   vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>', { noremap = true, silent = true })
@@ -289,13 +347,13 @@ function M.select_host()
     return
   elseif #host_names == 1 then
     -- If there's only one host, just use it directly
-    M.show_assigned_issues(host_names[1])
+    M.show_assigned_issues(host_names[1], "assigned")
     return
   end
 
   vim.ui.select(host_names, { prompt = 'Select a Mantis Host:' }, function(choice)
     if choice then
-      M.show_assigned_issues(choice)
+      M.show_assigned_issues(choice, "assigned")
     end
   end)
 end

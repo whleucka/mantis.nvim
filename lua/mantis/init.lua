@@ -133,6 +133,10 @@ function M:get_filtered_issues(filter_id)
   return self:call_api('issues?filter_id=' .. filter_id, 'GET')
 end
 
+function M:get_all_issues()
+  return self:call_api('issues', 'GET')
+end
+
 function M:get_my_assigned_issues()
   return self:call_api('issues?filter_id=assigned', 'GET')
 end
