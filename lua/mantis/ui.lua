@@ -144,16 +144,18 @@ function M.show_assigned_issues(host_name, view_mode)
   local win_width = vim.api.nvim_win_get_width(win)
 
   -- Define fixed column widths (without padding)
-  local id_width = 11
-  local status_width = 25
-  local project_category_width = 45 -- Combined project and category
-  local updated_width = 20
+  local id_width = 8
+  local priority_width = 10
+  local severity_width = 8
+  local status_width = 15
+  local project_category_width = 30 -- Combined project and category
+  local updated_width = 15
 
-  -- Calculate padding spaces (4 columns, 4 * 2 spaces)
-  local padding_width = 8
+  -- Calculate padding spaces (6 columns, 6 * 2 spaces)
+  local padding_width = 12
 
   -- Calculate width of fixed columns
-  local fixed_content_width = id_width + status_width + project_category_width + updated_width
+  local fixed_content_width = id_width + priority_width + severity_width + status_width + project_category_width + updated_width
 
   -- Calculate summary width
   local summary_width = win_width - fixed_content_width - padding_width
@@ -164,6 +166,8 @@ function M.show_assigned_issues(host_name, view_mode)
   local format_specifiers = {
     string.format('%%%ds', id_width),
     string.format('%%-%ds', status_width),
+    string.format('%%-%ds', priority_width),
+    string.format('%%-%ds', severity_width),
     string.format('%%-%ds', project_category_width), -- Combined project and category
     string.format('%%-%ds', summary_width),
     string.format('%%%ds', updated_width),
@@ -175,13 +179,15 @@ function M.show_assigned_issues(host_name, view_mode)
   local padding = math.floor((win_width - #title) / 2)
   table.insert(lines, string.rep(' ', padding) .. title) -- Line 0
   table.insert(lines, '') -- Line 1 (empty)
-  table.insert(lines, string.format(format_string, 'ID', 'STATUS', 'PROJECT', 'SUMMARY', 'UPDATED')) -- Line 2 (header)
+  table.insert(lines, string.format(format_string, 'ID', 'STATUS', 'PRIORITY', 'SEVERITY', 'CONTEXT', 'SUMMARY', 'LAST UPDATED')) -- Line 2 (header)
   table.insert(lines, string.rep('─', win_width)) -- Line 3 (separator below header)
 
   local defined_highlights = {} -- Moved here, outside the loop
 
   for idx, issue in ipairs(M.issues) do
     local id_str = string.format('%' .. id_width .. 's', tostring(issue.id))
+    local priority_str = string.format('%%-%ds', priority_width):format(issue.priority and issue.priority.name or 'N/A')
+    local severity_str = string.format('%%-%ds', severity_width):format(issue.severity and issue.severity.name or 'N/A')
     local status_display = issue.status.name
     if issue.handler and issue.handler.name then
       local handler_name = issue.handler.name
@@ -215,6 +221,8 @@ function M.show_assigned_issues(host_name, view_mode)
     local full_line = table.concat({
       id_str,
       status_str,
+      priority_str,
+      severity_str,
       project_category_str, -- Combined column
       summary_str,
       updated_str,
@@ -225,6 +233,8 @@ function M.show_assigned_issues(host_name, view_mode)
     -- Store extmark details for MantisDimText (UPDATED column)
     local updated_col_start = #id_str + 2 + -- id_str + 2 spaces
                               #status_str + 2 + -- status_str + 2 spaces
+                              #priority_str + 2 + -- priority_str + 2 spaces
+                              #severity_str + 2 + -- severity_str + 2 spaces
                               #project_category_str + 2 + -- combined column + 2 spaces
                               #summary_str + 2 -- summary_str + 2 spaces
     local updated_col_end = updated_col_start + #updated_str
@@ -259,6 +269,42 @@ function M.show_assigned_issues(host_name, view_mode)
         col_end = status_col_end,
         hl_group = group_name
       })
+    end
+
+    -- Store extmark details for priority highlights
+    if issue.priority and issue.priority.name then
+      local priority_name = issue.priority.name:lower()
+      local color_map = {
+        low = '#A8E6CF',      -- Pastel Green
+        normal = '#AEC6CF',   -- Pastel Blue
+        high = '#FDFD96',     -- Pastel Yellow
+        urgent = '#FFB347',   -- Pastel Orange
+        immediate = '#FF6961' -- Pastel Red
+      }
+      local color = color_map[priority_name]
+
+      if color then
+        local group_name = 'MantisPriority_' .. priority_name:gsub('%s+', '_')
+
+        if not defined_highlights[group_name] then
+          local cterm_color = util.hex_to_cterm(color)
+          local r, g, b = util.hex_to_rgb(color)
+          local luminance = util.get_luminance(r, g, b)
+          local fg_color = (luminance > 0.179) and '#000000' or '#FFFFFF'
+          local cterm_fg_color = (luminance > 0.179) and util.hex_to_cterm('#000000') or util.hex_to_cterm('#FFFFFF')
+          vim.api.nvim_set_hl(0, group_name, { bg = color, ctermbg = cterm_color, fg = fg_color, ctermfg = cterm_fg_color })
+          defined_highlights[group_name] = true
+        end
+
+        local priority_col_start = id_width + 2 + status_width + 2
+        local priority_col_end = priority_col_start + priority_width
+        table.insert(extmarks_to_apply, {
+          line = #lines - 1, -- 0-indexed line number
+          col_start = priority_col_start,
+          col_end = priority_col_end,
+          hl_group = group_name
+        })
+      end
     end
   end
 
