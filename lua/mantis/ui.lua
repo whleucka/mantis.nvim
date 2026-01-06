@@ -45,7 +45,11 @@ local function open_float_win()
   return buf, win
 end
 
+M.current_host = nil
+
 function M.show_assigned_issues(host_name)
+  M.current_host = host_name -- Store the current host
+
   local client = mantis.new(host_name)
   if not client then
     return
@@ -95,6 +99,10 @@ function M.show_assigned_issues(host_name)
   local format_string = table.concat(format_specifiers, '  ')
 
   local lines = {}
+  local title = 'Mantis Issues [' .. host_name .. ']'
+  local padding = math.floor((win_width - #title) / 2)
+  table.insert(lines, string.rep(' ', padding) .. title)
+  table.insert(lines, '') -- Empty line
   table.insert(lines, string.format(format_string, '', 'ID', 'Status', 'Project', 'Category', 'Summary', 'Updated'))
   table.insert(lines, string.rep('─', win_width))
   for _, issue in ipairs(M.issues) do
@@ -107,7 +115,7 @@ function M.show_assigned_issues(host_name)
     table.insert(lines, string.format(format_string, '■', id, status, project, category, summary, updated))
   end
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  vim.api.nvim_win_set_cursor(win, { 3, 0 })
+  vim.api.nvim_win_set_cursor(win, { 5, 0 }) -- Cursor starts at 5th line
 
   local defined_highlights = {}
 
@@ -123,9 +131,8 @@ function M.show_assigned_issues(host_name)
       end
 
       -- Highlight the box character
-      -- The line number is i + 1, because of the header and border
-      -- The box column starts at character 0 and has a length of 1
-      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 1, 0, 1)
+      -- The line number is i + 3, because of the title, empty line, header and border
+      vim.api.nvim_buf_add_highlight(buf, -1, group_name, i + 3, 0, 1)
     end
   end
 
@@ -136,9 +143,16 @@ function M.show_assigned_issues(host_name)
     silent = true,
     callback = function()
       local cursor = vim.api.nvim_win_get_cursor(0)
-      if cursor[1] > 3 then
+      if cursor[1] > 5 then
         vim.api.nvim_win_set_cursor(0, { cursor[1] - 1, cursor[2] })
       end
+    end,
+  })
+  vim.api.nvim_buf_set_keymap(buf, 'n', 'r', '', {
+    noremap = true,
+    silent = true,
+    callback = function()
+      M.show_assigned_issues(M.current_host)
     end,
   })
   vim.api.nvim_buf_set_keymap(buf, 'n', 'q', ':q<CR>', { noremap = true, silent = true })
