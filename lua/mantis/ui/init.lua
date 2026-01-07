@@ -2,14 +2,20 @@ local M = {}
 
 local config = require('mantis.config')
 local hosts = config.get_hosts()
-local host = nil
+local api = nil
 
-local function _set_host(selected_host)
-  host = selected_host
+local function _set_api(host)
+  api = require("mantis.api").new(host)
 end
 
-function M.show_assigned_issues()
-  print("Selected host", host)
+function M.view_issues()
+  if api == nil then
+    return
+  end
+  local ViewIssues = require("mantis.ui.view_issues")
+  local res = api.get_issues()
+
+  ViewIssues.render(res.issues)
 end
 
 function M.host_select()
@@ -25,8 +31,8 @@ function M.host_select()
   -- only one host
   if count == 1 then
     local _, host = next(hosts)
-    _set_host(host)
-    M.show_assigned_issues()
+    _set_api(host)
+    M.view_issues()
     return
   end
 
@@ -35,8 +41,8 @@ function M.host_select()
     hosts = hosts,
     on_submit = function(host)
       -- store the host table
-      _set_host(host)
-      M.show_assigned_issues()
+      _set_api(host)
+      M.view_issues()
     end,
   })
 end
