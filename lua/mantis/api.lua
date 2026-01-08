@@ -1,4 +1,3 @@
--- Mantis.nvim API Client
 local M = {}
 
 local host_config = nil

@@ -2,32 +2,33 @@ local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
 
-function M.render(issues)
-  local TOTAL_WIDTH   = 100
+function M.render(opts)
+  local TOTAL_WIDTH   = 150
   local CONTENT_WIDTH = TOTAL_WIDTH - 4
 
-  local COL_ID        = 12
-  local COL_PRIORITY  = 10
-  local COL_SEVERITY  = 10
-  local COL_CREATED   = 10
-  local COL_UPDATED   = 10
-  local SPACES        = 5
+  local COL_ID        = 15
+  local COL_STATUS    = 25
+  local COL_PRIORITY  = 15
+  local COL_SEVERITY  = 15
+  local COL_CREATED   = 15
+  local COL_UPDATED   = 15
 
-  local CONTEXT_WIDTH =
+  local SUMMARY_WIDTH =
       CONTENT_WIDTH
       - COL_ID
+      - COL_STATUS
       - COL_PRIORITY
       - COL_SEVERITY
       - COL_CREATED
       - COL_UPDATED
-      - SPACES
 
   local header_fmt    = string.format(
-    "%%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds",
+    "%%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds",
     COL_ID,
+    COL_STATUS,
     COL_PRIORITY,
     COL_SEVERITY,
-    CONTEXT_WIDTH,
+    SUMMARY_WIDTH,
     COL_CREATED,
     COL_UPDATED
   )
@@ -49,20 +50,21 @@ function M.render(issues)
   table.insert(lines,
     n.line(string.format(
       header_fmt,
-      "ID", "PRIORITY", "SEVERITY", "CONTEXT", "CREATED", "UPDATED"
+      "ID", "STATUS", "PRIORITY", "SEVERITY", "SUMMARY", "CREATED", "UPDATED"
     ))
   )
 
-  for _, issue in ipairs(issues) do
+  for _, issue in ipairs(opts.issues) do
     local created = util.time_ago(util.parse_iso8601(issue.created_at))
     local updated = util.time_ago(util.parse_iso8601(issue.updated_at))
     table.insert(lines,
       n.line(string.format(
         row_fmt,
         tostring(issue.id),
+        issue.status.label .. ' (' .. issue.handler.name .. ')',
         issue.priority.label,
         issue.severity.label,
-        util.truncate(issue.summary, CONTEXT_WIDTH),
+        util.truncate(issue.summary, SUMMARY_WIDTH),
         created,
         updated
       ))

@@ -15,7 +15,10 @@ function M.view_issues()
   local ViewIssues = require("mantis.ui.view_issues")
   local res = api.get_issues()
 
-  ViewIssues.render(res.issues)
+  -- show view issues
+  ViewIssues.render({
+    issues = res.issues
+  })
 end
 
 function M.host_select()

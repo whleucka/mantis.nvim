@@ -1,4 +1,3 @@
--- Mantis.nvim Configuration
 local M = {}
 
 M.options = {
