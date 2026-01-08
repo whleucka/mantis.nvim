@@ -7,9 +7,9 @@ function M.render(opts)
   local TOTAL_WIDTH  = config.options.view_issues.ui.width
   local TOTAL_HEIGHT = config.options.view_issues.ui.height
   local COL_ID       = 10
-  local COL_STATUS   = math.floor((TOTAL_WIDTH + COL_ID) * 0.15)
-  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + COL_ID) * 0.18)
-  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + COL_ID) * 0.3)
+  local COL_STATUS   = math.floor((TOTAL_WIDTH + 15) * 0.15)
+  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + 15) * 0.18)
+  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + 20) * 0.3)
   local COL_CREATED  = math.floor((TOTAL_WIDTH) * 0.1)
   local COL_UPDATED  = math.floor((TOTAL_WIDTH) * 0.1)
 
@@ -37,9 +37,9 @@ function M.render(opts)
     local updated = util.time_ago(util.parse_iso8601(issue.updated_at))
 
     table.insert(lines, n.line(
-      n.text(string.format("%-" .. COL_ID .. "s ", string.format("%07d", issue.id)), "Constant"),
+      n.text(string.format("%-" .. COL_ID .. "s ", string.format("%07d", issue.id)), "String"),
       n.text(string.format(" %-" .. COL_STATUS .. "s ", status), status_hl_group),
-      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context), "String"),
+      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context), "Constant"),
       n.text(string.format(" %-" .. COL_SUMMARY .. "s ", summary)),
       n.text(string.format(" %-" .. COL_CREATED .. "s ", created), "Comment"),
       n.text(string.format(" %-" .. COL_UPDATED .. "s", updated), "Comment")
@@ -56,7 +56,7 @@ function M.render(opts)
 
   -- view toggles
   local all_issues = n.button({
-    label = "View All",
+    label = "View All Issues",
     global_press_key = "v",
     on_press = function()
       opts.on_view_issues()
@@ -65,7 +65,7 @@ function M.render(opts)
   })
 
   local assigned_issues = n.button({
-    label = "View Assigned",
+    label = "View Assigned Issues",
     global_press_key = "v",
     on_press = function()
       opts.on_assigned_issues()
@@ -109,7 +109,7 @@ function M.render(opts)
         para
       ),
       n.box(
-        { flex = 1, direction = "row" },
+        { flex = 0, direction = "row" },
         btn_view, btn_assign_user, btn_change_status, btn_quit
       )
     )
