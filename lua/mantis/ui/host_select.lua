@@ -32,26 +32,18 @@ function M.render(opts)
     on_change = function(node)
       signal.selected = node.id
     end,
-  })
-
-  -- define button
-  local button = n.button({
-    label = "View Issues",
-    on_press = function()
-      -- get value from SignalValue
-      local host_key = signal.selected:get_value()
+    on_select = function(node)
       if on_submit then
-        on_submit(host_key)
+        on_submit(node.id)
       end
       renderer:close()
-    end,
+    end
   })
 
   -- layout
   local body = function()
     return n.rows(
-      select,
-      button
+      select
     )
   end
 

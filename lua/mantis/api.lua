@@ -5,7 +5,7 @@ local config = require('mantis.config')
 local curl = require('plenary.curl')
 
 function M.new(host_name)
-  host_config = config.get(host_name)
+  host_config = config.options.hosts[host_name]
   if not host_config then
     vim.notify('Mantis: Host "' .. (host_name or 'default') .. '" not configured.', vim.log.levels.ERROR)
     return nil
@@ -25,6 +25,10 @@ function M.new(host_name)
 end
 
 local function call_api(endpoint, method, data)
+  if host_config == nil then
+    return
+  end
+
   method = method or 'GET'
   local headers = {
     ['Authorization'] = host_config.token,

@@ -1,74 +1,69 @@
 local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
+local config = require("mantis.config")
 
 function M.render(opts)
-  local TOTAL_WIDTH   = 150
-  local CONTENT_WIDTH = TOTAL_WIDTH - 4
+  local TOTAL_WIDTH      = config.options.ui.view_issues.width
+  local TOTAL_HEIGHT    = config.options.ui.view_issues.height
+  local COL_ID           = 10
+  local COL_COLOR        = 1
+  local COL_STATUS       = math.floor((TOTAL_WIDTH + 10) * 0.15)
+  local COL_CONTEXT      = math.floor((TOTAL_WIDTH + 10) * 0.18)
+  local COL_SUMMARY      = math.floor((TOTAL_WIDTH + 10) * 0.3)
+  local COL_CREATED      = math.floor((TOTAL_WIDTH) * 0.1)
+  local COL_UPDATED      = math.floor((TOTAL_WIDTH) * 0.1)
 
-  local COL_ID        = 15
-  local COL_STATUS    = 25
-  local COL_PRIORITY  = 15
-  local COL_SEVERITY  = 15
-  local COL_CREATED   = 15
-  local COL_UPDATED   = 15
 
-  local SUMMARY_WIDTH =
-      CONTENT_WIDTH
-      - COL_ID
-      - COL_STATUS
-      - COL_PRIORITY
-      - COL_SEVERITY
-      - COL_CREATED
-      - COL_UPDATED
-
-  local header_fmt    = string.format(
-    "%%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds %%-%ds",
+  local line_fmt = string.format(
+    "%%-%ds %%-%ds  %%-%ds  %%-%ds  %%-%ds  %%-%ds  %%-%ds",
     COL_ID,
+    COL_COLOR,
     COL_STATUS,
-    COL_PRIORITY,
-    COL_SEVERITY,
-    SUMMARY_WIDTH,
+    COL_CONTEXT,
+    COL_SUMMARY,
     COL_CREATED,
     COL_UPDATED
   )
 
-  local lines         = {}
-  local row_fmt       = header_fmt
-
-  local signal        = n.create_signal({
+  local lines      = {}
+  local signal     = n.create_signal({
     value = "",
     issue = nil
   })
 
-  local renderer      = n.create_renderer({
+  local renderer   = n.create_renderer({
     width = TOTAL_WIDTH,
-    height = 50,
+    height = TOTAL_HEIGHT,
     border_label = "Issues",
   })
 
-  table.insert(lines,
-    n.line(string.format(
-      header_fmt,
-      "ID", "STATUS", "PRIORITY", "SEVERITY", "SUMMARY", "CREATED", "UPDATED"
-    ))
+  table.insert(lines, n.line(
+    n.text(string.format(line_fmt, "ID", "", "STATUS", "CONTEXT", "SUMMARY", "CREATED", "UPDATED"),
+      "Comment"))
   )
 
   for _, issue in ipairs(opts.issues) do
+    -- status hl
+    local status_hl_group = "MantisStatus_" .. issue.status.label
+    vim.api.nvim_set_hl(0, status_hl_group, { bg = issue.status.color, fg = "#000000" })
+
+    -- format values
+    local status = util.truncate(issue.status.label .. ' (' .. issue.handler.name .. ')', COL_STATUS)
+    local context = util.truncate('[' .. issue.project.name .. '] ' .. issue.category.name, COL_CONTEXT)
+    local summary = util.truncate(issue.summary, COL_SUMMARY)
     local created = util.time_ago(util.parse_iso8601(issue.created_at))
     local updated = util.time_ago(util.parse_iso8601(issue.updated_at))
-    table.insert(lines,
-      n.line(string.format(
-        row_fmt,
-        tostring(issue.id),
-        issue.status.label .. ' (' .. issue.handler.name .. ')',
-        issue.priority.label,
-        issue.severity.label,
-        util.truncate(issue.summary, SUMMARY_WIDTH),
-        created,
-        updated
-      ))
-    )
+
+    table.insert(lines, n.line(
+      n.text(string.format("%-" .. COL_ID .. "s ", tostring(issue.id))),
+      n.text(string.format("%-" .. COL_COLOR .. "s ", ""), status_hl_group),
+      n.text(string.format(" %-" .. COL_STATUS .. "s ", status)),
+      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context)),
+      n.text(string.format(" %-" .. COL_SUMMARY .. "s ", summary)),
+      n.text(string.format(" %-" .. COL_CREATED .. "s ", created), "Comment"),
+      n.text(string.format(" %-" .. COL_UPDATED .. "s", updated), "Comment")
+    ))
   end
 
   -- search input

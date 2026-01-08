@@ -1,7 +1,7 @@
 local M = {}
 
 local config = require('mantis.config')
-local hosts = config.get_hosts()
+local hosts = config.options.hosts
 local api = nil
 
 local function _set_api(host)
@@ -14,10 +14,11 @@ function M.view_issues()
   end
   local ViewIssues = require("mantis.ui.view_issues")
   local res = api.get_issues()
+  local issues = (res and res.issues) or {}
 
   -- show view issues
   ViewIssues.render({
-    issues = res.issues
+    issues = issues
   })
 end
 
