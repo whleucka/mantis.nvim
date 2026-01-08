@@ -53,8 +53,14 @@ function M.render(opts)
     max_lines = TOTAL_HEIGHT,
     lines = lines,
     on_focus = function(state)
-      -- FIXME this is deprecated
-      vim.api.nvim_win_set_option(state.winid, "cursorline", true)
+      vim.wo[state.winid].cursorline = true
+
+      vim.keymap.set("n", "<CR>", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        local issue = opts.issues[current_line]
+        print(issue.id)
+        renderer:close()
+      end, { buffer = state.bufnr })
 
       vim.keymap.set("n", "j", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
