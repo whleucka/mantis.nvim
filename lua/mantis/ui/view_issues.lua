@@ -39,7 +39,7 @@ function M.render(opts)
     local updated = util.time_ago(util.parse_iso8601(issue.updated_at))
 
     table.insert(lines, n.line(
-      n.text(string.format("%-" .. COL_ID .. "s ", tostring(issue.id))),
+      n.text(string.format("%-" .. COL_ID .. "s ", string.format("%07d", issue.id))),
       n.text(string.format("%-" .. COL_COLOR .. "s ", ""), status_hl_group),
       n.text(string.format(" %-" .. COL_STATUS .. "s ", status)),
       n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context)),
@@ -48,28 +48,6 @@ function M.render(opts)
       n.text(string.format(" %-" .. COL_UPDATED .. "s", updated), "Comment")
     ))
   end
-
-  -- search input
-  local search = n.text_input({
-    border_label = "Search Issues",
-    placeholder = "...",
-    autofocus = false,
-    autoresize = true,
-    size = math.floor(TOTAL_WIDTH * 0.95),
-    value = signal.value,
-    max_lines = 1,
-    on_change = function(value, component)
-      signal.value = value
-    end,
-  })
-
-  local button = n.button({
-    label = " OK ",
-    global_press_key = "<C-d>",
-    on_press = function()
-      print("WIP")
-    end,
-  })
 
   -- issue rows
   local para = n.paragraph({
@@ -83,11 +61,6 @@ function M.render(opts)
   local body = function()
     return n.box(
       { flex = 1, direction = "column" },
-      n.box(
-        { flex = 0, direction = "row" },
-        n.box( { flex = 1 }, search),
-        button
-      ),
       n.box(
         { flex = 1, direction = "column" },
         para
