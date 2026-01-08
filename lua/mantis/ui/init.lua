@@ -12,6 +12,14 @@ local function _set_host(host)
   mantis = api.new(host)
 end
 
+function M.view_issue(id)
+  if mantis == nil then
+    return
+  end
+  local res = mantis:get_issue(id)
+  print(vim.inspect(res))
+end
+
 function M.view_issues(page, assigned)
   if assigned == nil then
     assigned = false
@@ -33,6 +41,9 @@ function M.view_issues(page, assigned)
     issues = issues,
     has_prev_page = has_prev_page,
     has_next_page = has_next_page,
+    on_view_issue = function(id)
+      M.view_issue(id)
+    end,
     on_view_issues = function()
       M.view_issues(1)
     end,

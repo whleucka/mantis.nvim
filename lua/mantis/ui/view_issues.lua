@@ -58,23 +58,8 @@ function M.render(opts)
       vim.keymap.set("n", "<CR>", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = opts.issues[current_line]
-        print(issue.id)
+        opts.on_view_issue(issue.id)
         renderer:close()
-      end, { buffer = state.bufnr })
-
-      vim.keymap.set("n", "j", function()
-        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        local total_lines = vim.api.nvim_buf_line_count(state.bufnr)
-        if current_line + 1 <= total_lines then
-          vim.api.nvim_win_set_cursor(state.winid, { current_line + 1, 0 })
-        end
-      end, { buffer = state.bufnr })
-
-      vim.keymap.set("n", "k", function()
-        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        if current_line - 1 >= 1 then
-          vim.api.nvim_win_set_cursor(state.winid, { current_line - 1, 0 })
-        end
       end, { buffer = state.bufnr })
     end
   })
