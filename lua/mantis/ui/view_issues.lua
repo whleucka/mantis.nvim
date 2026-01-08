@@ -6,7 +6,7 @@ local config = require("mantis.config")
 function M.render(opts)
   local TOTAL_WIDTH  = config.options.view_issues.ui.width
   local TOTAL_HEIGHT = config.options.view_issues.ui.height
-  local COL_ID       = 10
+  local COL_ID       = 8
   local COL_STATUS   = math.floor((TOTAL_WIDTH + 15) * 0.15)
   local COL_CONTEXT  = math.floor((TOTAL_WIDTH + 15) * 0.18)
   local COL_SUMMARY  = math.floor((TOTAL_WIDTH + 20) * 0.3)
@@ -39,7 +39,7 @@ function M.render(opts)
     table.insert(lines, n.line(
       n.text(string.format("%-" .. COL_ID .. "s ", string.format("%07d", issue.id)), "String"),
       n.text(string.format(" %-" .. COL_STATUS .. "s ", status), status_hl_group),
-      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context), "Constant"),
+      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context), "Keyword"),
       n.text(string.format(" %-" .. COL_SUMMARY .. "s ", summary)),
       n.text(string.format(" %-" .. COL_CREATED .. "s ", created), "Comment"),
       n.text(string.format(" %-" .. COL_UPDATED .. "s", updated), "Comment")
@@ -51,7 +51,26 @@ function M.render(opts)
     border_label = string.format("Mantis Issues [%s]", opts.host),
     autofocus = true,
     max_lines = TOTAL_HEIGHT,
-    lines = lines
+    lines = lines,
+    on_focus = function(state)
+      -- FIXME this is deprecated
+      vim.api.nvim_win_set_option(state.winid, "cursorline", true)
+
+      vim.keymap.set("n", "j", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        local total_lines = vim.api.nvim_buf_line_count(state.bufnr)
+        if current_line + 1 <= total_lines then
+          vim.api.nvim_win_set_cursor(state.winid, { current_line + 1, 0 })
+        end
+      end, { buffer = state.bufnr })
+
+      vim.keymap.set("n", "k", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        if current_line - 1 >= 1 then
+          vim.api.nvim_win_set_cursor(state.winid, { current_line - 1, 0 })
+        end
+      end, { buffer = state.bufnr })
+    end
   })
 
   -- view toggles
