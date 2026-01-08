@@ -38,6 +38,14 @@ function M.truncate(str, width)
   return str:sub(1, width - 1) .. "…"
 end
 
+local timezone_offset = (function()
+  local now = os.time()
+  local local_t = os.date("*t", now)
+  local utc_t = os.date("!*t", now)
+  local_t.isdst = false
+  return os.difftime(os.time(local_t), os.time(utc_t))
+end)()
+
 function M.parse_iso8601(ts)
   -- strip timezone, assume UTC
   local date, time = ts:match("^(%d+-%d+-%d+)T(%d+:%d+:%d+)")
@@ -56,7 +64,7 @@ function M.parse_iso8601(ts)
     min   = tonumber(mm),
     sec   = tonumber(ss),
     isdst = false,
-  })
+  }) + timezone_offset
 end
 
 function M.time_ago(epoch)
