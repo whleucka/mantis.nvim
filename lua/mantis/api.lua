@@ -145,8 +145,10 @@ function M:get_all_issues()
   return call_api('issues', 'GET')
 end
 
-function M:get_my_assigned_issues()
-  return call_api('issues?filter_id=assigned', 'GET')
+function M:get_my_assigned_issues(page_size, page)
+  page_size = page_size or 10
+  page = page or 1
+  return call_api('issues?filter_id=assigned&page_size=' .. page_size .. '&page=' .. page, 'GET')
 end
 
 function M:get_my_reported_issues()

@@ -7,23 +7,38 @@ local api = require("mantis.api")
 local mantis = nil
 local page_size = config.options.view_issues.page_size
 
-local function _set_api(host)
+local function _set_host(host)
   current_host = host
   mantis = api.new(host)
 end
 
-function M.view_issues(page)
+function M.view_issues(page, assigned)
+  if assigned == nil then
+    assigned = false
+  end
   if mantis == nil then
     return
   end
+
   local ViewIssues = require("mantis.ui.view_issues")
-  local res = mantis.get_issues(page, page_size)
+  local res = (assigned and mantis.get_my_assigned_issues(page, page_size)) or mantis.get_issues(page, page_size)
   local issues = (res and res.issues) or {}
+  local has_prev_page = (issues and page ~= 1 and true) or false
+  local has_next_page = (issues and #issues == page_size and true) or false
 
   -- show view issues
   ViewIssues.render({
     host = current_host,
-    issues = issues
+    assigned = assigned,
+    issues = issues,
+    has_prev_page = has_prev_page,
+    has_next_page = has_next_page,
+    on_view_issues = function()
+      M.view_issues(1)
+    end,
+    on_assigned_issues = function()
+      M.view_issues(1, true)
+    end
   })
 end
 
@@ -40,7 +55,7 @@ function M.host_select()
   -- only one host
   if count == 1 then
     local host, _ = next(hosts)
-    _set_api(host)
+    _set_host(host)
     M.view_issues(1)
     return
   end
@@ -50,7 +65,7 @@ function M.host_select()
     hosts = hosts,
     on_submit = function(host)
       -- store the host table
-      _set_api(host)
+      _set_host(host)
       M.view_issues(1)
     end,
   })
