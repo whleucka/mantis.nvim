@@ -33,4 +33,48 @@ function M.get_luminance(r, g, b)
   return 0.2126 * r_lin + 0.7152 * g_lin + 0.0722 * b_lin
 end
 
+function M.truncate(str, width)
+  if #str <= width then return str end
+  return str:sub(1, width - 1) .. "…"
+end
+
+function M.parse_iso8601(ts)
+  -- strip timezone, assume UTC
+  local date, time = ts:match("^(%d+-%d+-%d+)T(%d+:%d+:%d+)")
+  if not date or not time then
+    return nil
+  end
+
+  local y, m, d = date:match("(%d+)-(%d+)-(%d+)")
+  local hh, mm, ss = time:match("(%d+):(%d+):(%d+)")
+
+  return os.time({
+    year  = tonumber(y),
+    month = tonumber(m),
+    day   = tonumber(d),
+    hour  = tonumber(hh),
+    min   = tonumber(mm),
+    sec   = tonumber(ss),
+    isdst = false,
+  })
+end
+
+function M.time_ago(epoch)
+  if not epoch then return "?" end
+
+  local diff = os.time() - epoch
+
+  if diff < 60 then
+    return diff .. "s ago"
+  elseif diff < 3600 then
+    return math.floor(diff / 60) .. "m ago"
+  elseif diff < 86400 then
+    return math.floor(diff / 3600) .. "h ago"
+  elseif diff < 604800 then
+    return math.floor(diff / 86400) .. "d ago"
+  else
+    return math.floor(diff / 604800) .. "w ago"
+  end
+end
+
 return M
