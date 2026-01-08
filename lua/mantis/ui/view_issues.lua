@@ -4,52 +4,35 @@ local util = require("mantis.util")
 local config = require("mantis.config")
 
 function M.render(opts)
-  local TOTAL_WIDTH      = config.options.ui.view_issues.width
-  local TOTAL_HEIGHT    = config.options.ui.view_issues.height
-  local COL_ID           = 10
-  local COL_COLOR        = 1
-  local COL_STATUS       = math.floor((TOTAL_WIDTH + 10) * 0.15)
-  local COL_CONTEXT      = math.floor((TOTAL_WIDTH + 10) * 0.18)
-  local COL_SUMMARY      = math.floor((TOTAL_WIDTH + 10) * 0.3)
-  local COL_CREATED      = math.floor((TOTAL_WIDTH) * 0.1)
-  local COL_UPDATED      = math.floor((TOTAL_WIDTH) * 0.1)
+  local TOTAL_WIDTH  = config.options.view_issues.ui.width
+  local TOTAL_HEIGHT = config.options.view_issues.ui.height
+  local COL_ID       = 10
+  local COL_COLOR    = 1
+  local COL_STATUS   = math.floor((TOTAL_WIDTH + 10) * 0.15)
+  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + 10) * 0.18)
+  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + 10) * 0.3)
+  local COL_CREATED  = math.floor((TOTAL_WIDTH) * 0.1)
+  local COL_UPDATED  = math.floor((TOTAL_WIDTH) * 0.1)
 
-
-  local line_fmt = string.format(
-    "%%-%ds %%-%ds  %%-%ds  %%-%ds  %%-%ds  %%-%ds  %%-%ds",
-    COL_ID,
-    COL_COLOR,
-    COL_STATUS,
-    COL_CONTEXT,
-    COL_SUMMARY,
-    COL_CREATED,
-    COL_UPDATED
-  )
-
-  local lines      = {}
-  local signal     = n.create_signal({
+  local signal       = n.create_signal({
     value = "",
     issue = nil
   })
 
-  local renderer   = n.create_renderer({
+  local renderer     = n.create_renderer({
     width = TOTAL_WIDTH,
     height = TOTAL_HEIGHT,
     border_label = "Issues",
   })
 
-  table.insert(lines, n.line(
-    n.text(string.format(line_fmt, "ID", "", "STATUS", "CONTEXT", "SUMMARY", "CREATED", "UPDATED"),
-      "Comment"))
-  )
-
+  local lines   = {}
   for _, issue in ipairs(opts.issues) do
     -- status hl
     local status_hl_group = "MantisStatus_" .. issue.status.label
     vim.api.nvim_set_hl(0, status_hl_group, { bg = issue.status.color, fg = "#000000" })
 
     -- format values
-    local status = util.truncate(issue.status.label .. ' (' .. issue.handler.name .. ')', COL_STATUS)
+    local status  = util.truncate(issue.status.label .. ' (' .. issue.handler.name .. ')', COL_STATUS)
     local context = util.truncate('[' .. issue.project.name .. '] ' .. issue.category.name, COL_CONTEXT)
     local summary = util.truncate(issue.summary, COL_SUMMARY)
     local created = util.time_ago(util.parse_iso8601(issue.created_at))
@@ -68,11 +51,11 @@ function M.render(opts)
 
   -- search input
   local search = n.text_input({
-    border_label = "Search",
+    border_label = "Search Issues",
     placeholder = "...",
     autofocus = false,
     autoresize = true,
-    size = 1,
+    size = math.floor(TOTAL_WIDTH * 0.95),
     value = signal.value,
     max_lines = 1,
     on_change = function(value, component)
@@ -80,27 +63,33 @@ function M.render(opts)
     end,
   })
 
+  local button = n.button({
+    label = " OK ",
+    global_press_key = "<C-d>",
+    on_press = function()
+      print("WIP")
+    end,
+  })
+
   -- issue rows
   local para = n.paragraph({
-    border_label = "Issues",
+    border_label = "View Issues",
     autofocus = true,
-    max_lines = 20,
+    max_lines = 50,
     lines = lines
   })
 
   -- layout
   local body = function()
     return n.box(
-      {
-        flex = 1,
-        direction = "column"
-      },
-      search,
+      { flex = 1, direction = "column" },
       n.box(
-        {
-          flex = 1,
-          direction = "column",
-        },
+        { flex = 0, direction = "row" },
+        n.box( { flex = 1 }, search),
+        button
+      ),
+      n.box(
+        { flex = 1, direction = "column" },
         para
       )
     )

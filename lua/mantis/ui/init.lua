@@ -13,7 +13,8 @@ function M.view_issues()
     return
   end
   local ViewIssues = require("mantis.ui.view_issues")
-  local res = api.get_issues()
+  local page_size = config.options.view_issues.per_page
+  local res = api.get_issues(page_size)
   local issues = (res and res.issues) or {}
 
   -- show view issues
@@ -34,7 +35,7 @@ function M.host_select()
 
   -- only one host
   if count == 1 then
-    local _, host = next(hosts)
+    local host, _ = next(hosts)
     _set_api(host)
     M.view_issues()
     return
