@@ -1,12 +1,14 @@
 local M = {}
 
 local config = require('mantis.config')
+local current_host = nil
 local hosts = config.options.hosts
 local api = require("mantis.api")
 local mantis = nil
 local page_size = config.options.view_issues.page_size
 
 local function _set_api(host)
+  current_host = host
   mantis = api.new(host)
 end
 
@@ -20,6 +22,7 @@ function M.view_issues(page)
 
   -- show view issues
   ViewIssues.render({
+    host = current_host,
     issues = issues
   })
 end

@@ -8,9 +8,9 @@ function M.render(opts)
   local TOTAL_HEIGHT = config.options.view_issues.ui.height
   local COL_ID       = 10
   local COL_COLOR    = 1
-  local COL_STATUS   = math.floor((TOTAL_WIDTH + 10) * 0.15)
-  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + 10) * 0.18)
-  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + 10) * 0.3)
+  local COL_STATUS   = math.floor((TOTAL_WIDTH + COL_ID + COL_COLOR) * 0.15)
+  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + COL_ID + COL_COLOR) * 0.18)
+  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + COL_ID + COL_COLOR) * 0.3)
   local COL_CREATED  = math.floor((TOTAL_WIDTH) * 0.1)
   local COL_UPDATED  = math.floor((TOTAL_WIDTH) * 0.1)
 
@@ -22,7 +22,6 @@ function M.render(opts)
   local renderer     = n.create_renderer({
     width = TOTAL_WIDTH,
     height = TOTAL_HEIGHT,
-    border_label = "Issues",
   })
 
   local lines   = {}
@@ -51,9 +50,9 @@ function M.render(opts)
 
   -- issue rows
   local para = n.paragraph({
-    border_label = "View Issues",
+    border_label = string.format("Mantis Issues [%s]", opts.host),
     autofocus = true,
-    max_lines = 50,
+    max_lines = 80,
     lines = lines
   })
 
