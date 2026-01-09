@@ -16,8 +16,18 @@ function M.view_issue(id)
   if mantis == nil then
     return
   end
+
+  -- local ViewIssue = require("mantis.ui.view_issue")
+
+  -- call it with : so self is passed
   local res = mantis:get_issue(id)
-  print(vim.inspect(res))
+  local issue = (res and res.issues[1]) or {}
+  print(vim.inspect(issue))
+
+  -- ViewIssue.render({
+  --   host = current_host,
+  --   issue = issue,
+  -- })
 end
 
 function M.view_issues(page, assigned)
@@ -37,6 +47,7 @@ function M.view_issues(page, assigned)
   -- show view issues
   ViewIssues.render({
     host = current_host,
+    url = config.options.hosts[current_host].url,
     assigned = assigned,
     issues = issues,
     has_prev_page = has_prev_page,

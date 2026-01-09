@@ -13,11 +13,6 @@ function M.render(opts)
   local COL_CREATED  = math.floor((TOTAL_WIDTH) * 0.1)
   local COL_UPDATED  = math.floor((TOTAL_WIDTH) * 0.1)
 
-  local signal       = n.create_signal({
-    value = "",
-    issue = nil
-  })
-
   local renderer     = n.create_renderer({
     width = TOTAL_WIDTH,
     height = TOTAL_HEIGHT,
@@ -58,8 +53,15 @@ function M.render(opts)
       vim.keymap.set("n", "<CR>", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = opts.issues[current_line]
-        opts.on_view_issue(issue.id)
-        renderer:close()
+        -- opts.on_view_issue(issue.id)
+        -- renderer:close()
+      end, { buffer = state.bufnr })
+
+      vim.keymap.set("n", "o", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        local issue = opts.issues[current_line]
+        local url = opts.url .. '/view.php?id=' .. issue.id
+        vim.system({'xdg-open', url}, { detach = true })
       end, { buffer = state.bufnr })
     end
   })

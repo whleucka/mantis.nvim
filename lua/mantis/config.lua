@@ -3,6 +3,12 @@ local M = {}
 M.options = {
   debug = false,
   hosts = {},
+  view_issue = {
+    ui = {
+      width = 175,
+      height = 80,
+    },
+  },
   view_issues = {
     page_size = 50,
     ui = {
