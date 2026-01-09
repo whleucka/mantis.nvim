@@ -4,6 +4,10 @@ local util = require("mantis.util")
 local config = require("mantis.config")
 
 function M.render(opts)
+  local signal       = n.create_signal({
+    keymaps_hidden = true
+  })
+
   local TOTAL_WIDTH  = config.options.view_issues.ui.width
   local TOTAL_HEIGHT = config.options.view_issues.ui.height
   local COL_ID       = 8
@@ -43,12 +47,17 @@ function M.render(opts)
 
   -- issue rows
   local para = n.paragraph({
-    border_label = string.format("Mantis Issues [%s]", opts.host),
+    border_label = string.format("%s Mantis Issues [%s]", (opts.assigned and "Assigned") or "All", opts.host),
     autofocus = true,
     max_lines = TOTAL_HEIGHT,
     lines = lines,
     on_focus = function(state)
       vim.wo[state.winid].cursorline = true
+
+      vim.keymap.set("n", "?", function()
+        local setting = not signal.keymaps_hidden
+        signal.keymaps_hidden = setting
+      end, { buffer = state.bufnr })
 
       vim.keymap.set("n", "<CR>", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
@@ -68,7 +77,8 @@ function M.render(opts)
 
   -- view toggles
   local all_issues = n.button({
-    label = "View All Issues",
+    hidden = true,
+    label = "All Issues",
     global_press_key = "v",
     on_press = function()
       opts.on_view_issues()
@@ -77,7 +87,8 @@ function M.render(opts)
   })
 
   local assigned_issues = n.button({
-    label = "View Assigned Issues",
+    hidden = true,
+    label = "Assigned Issues",
     global_press_key = "v",
     on_press = function()
       opts.on_assigned_issues()
@@ -88,28 +99,61 @@ function M.render(opts)
   local btn_view = (opts.assigned and all_issues) or assigned_issues
 
   local btn_assign_user = n.button({
-    label = "Assign User",
+    hidden = true,
+    label = "Assign",
     global_press_key = "a",
     on_press = function()
-      print("WIP: assign user")
+      print("WIP: assign")
     end,
   })
 
   local btn_change_status = n.button({
-    label = "Change Status",
+    hidden = true,
+    label = "Status",
     global_press_key = "s",
     on_press = function()
-      print("WIP: change status")
+      print("WIP: status")
+    end,
+  })
+
+  local btn_new_issue = n.button({
+    hidden = true,
+    label = "New Issue",
+    global_press_key = "n",
+    on_press = function()
+      opts.on_new_issue()
+      renderer:close()
     end,
   })
 
   -- quit
   local btn_quit = n.button({
+    hidden = true,
     label = "Quit",
     global_press_key = "q",
     on_press = function()
       renderer:close()
     end,
+  })
+
+  -- helper
+  local keymaps = {
+    "a Assign",
+    "s Status",
+    "n New",
+    "o Open issue in browser",
+    "v Toggle view",
+    "q Quit",
+  }
+  local helper = n.paragraph({
+    hidden = signal.keymaps_hidden,
+    border_label = string.format("Keymaps", opts.host),
+    autofocus = false,
+    max_lines = 10,
+    align = 'center',
+    lines = {
+      n.line(n.text(table.concat(keymaps, " | "), "Comment"))
+    }
   })
 
   -- layout
@@ -121,8 +165,12 @@ function M.render(opts)
         para
       ),
       n.box(
+        { flex = 0, direction = "column" },
+        helper
+      ),
+      n.box(
         { flex = 0, direction = "row" },
-        btn_view, btn_assign_user, btn_change_status, btn_quit
+        btn_new_issue, btn_view, btn_assign_user, btn_change_status, btn_quit
       )
     )
   end

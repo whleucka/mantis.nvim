@@ -12,6 +12,26 @@ local function _set_host(host)
   mantis = api.new(host)
 end
 
+function M.create_issue(data)
+  if mantis == nil then
+    return
+  end
+
+  local res = mantis.create_issue(data)
+  print(vim.inspect(res))
+end
+
+function M.new_issue()
+  local NewIssue = require("mantis.ui.new_issue")
+
+  NewIssue.render({
+    host = current_host,
+    on_create_issue = function(data)
+      M.create_issue(data)
+    end
+  })
+end
+
 function M.view_issue(id)
   if mantis == nil then
     return
@@ -60,6 +80,9 @@ function M.view_issues(page, assigned)
     end,
     on_assigned_issues = function()
       M.view_issues(1, true)
+    end,
+    on_new_issue = function()
+      M.new_issue()
     end
   })
 end
