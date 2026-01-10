@@ -55,14 +55,13 @@ function M.render(opts)
       vim.wo[state.winid].cursorline = true
 
       vim.keymap.set("n", "?", function()
-        local setting = not signal.keymaps_hidden
-        signal.keymaps_hidden = setting
+        signal.keymaps_hidden = not signal.keymaps_hidden:get_value()
       end, { buffer = state.bufnr })
 
       vim.keymap.set("n", "<CR>", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = opts.issues[current_line]
-        -- opts.on_view_issue(issue.id)
+        opts.on_view_issue(issue.id)
         -- renderer:close()
       end, { buffer = state.bufnr })
 
