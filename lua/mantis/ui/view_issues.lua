@@ -10,43 +10,43 @@ local function build_nodes(issues)
   return nodes
 end
 
-function M.render(props)
-  local signal       = n.create_signal({
+local function _render_tree(props)
+  local signal   = n.create_signal({
     selected = nil,
-    issues = props.issues,
   })
 
-  local renderer     = n.create_renderer({
+  local renderer = n.create_renderer({
     width = props.options.ui.width,
     height = props.options.ui.height,
   })
 
-  local tree         = n.tree({
+  local tree     = n.tree({
     flex = 1,
     autofocus = true,
     border_label = "MantisBT Issues",
-    data = build_nodes(signal.issues:get_value()),
+    data = build_nodes(props.issues),
     on_focus = function(state)
       vim.wo[state.winid].cursorline = true
-      -- Open issue in browser
+      -- open issue in browser
       vim.keymap.set("n", "o", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        local issue = signal.issues:get_value()[current_line]
+        local issue = props.issues[current_line]
         local url = props.host.url .. '/view.php?id=' .. issue.id
         vim.system({ 'xdg-open', url }, { detach = true })
       end, { buffer = state.bufnr })
 
+      -- change status
       vim.keymap.set("n", "s", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        local issue = signal.issues:get_value()[current_line]
+        local issue = props.issues[current_line]
         props.on_change_status(issue.id, function(updated_issue)
-          local issues = vim.deepcopy(signal.issues:get_value())
-          issues[current_line] = updated_issue
-          -- update trigger
-          signal:set_value({ issues = issues })
+          props.issues[current_line] = updated_issue.issues[1]
+          renderer:close()
+          _render_tree(props)
         end)
       end, { buffer = state.bufnr })
 
+      -- quit with 'q'
       vim.keymap.set("n", "q", function()
         renderer:close()
       end, { buffer = state.bufnr })
@@ -84,20 +84,11 @@ function M.render(props)
       return line
     end,
   })
+  renderer:render(n.rows(tree))
+end
 
-  local subscription = signal:observe(function(prev, current)
-    print("Something changed!")
-    renderer:redraw()
-  end)
-
-  -- layout
-  local body         = n.rows(tree)
-
-  renderer:render(body)
-
-  renderer:on_unmount(function()
-    subscription:unsubscribe()
-  end)
+function M.render(props)
+  _render_tree(props)
 end
 
 return M
