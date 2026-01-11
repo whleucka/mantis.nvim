@@ -1,94 +1,71 @@
 local M = {}
 
-local config = require('mantis.config')
-local current_host = nil
-local hosts = config.options.hosts
+local config = require("mantis.config")
 local api = require("mantis.api")
-local mantis = nil
-local page_size = config.options.view_issues.page_size
+local current_host = nil
+local current_page = 1
+local hosts = config.options.hosts
 
 local function _set_host(host)
   current_host = host
-  mantis = api.new(host)
 end
 
-function M.create_issue(data)
-  if mantis == nil then
+local function _mantis()
+  if current_host == nil then
     return
   end
-
-  local res = mantis.create_issue(data)
-  print(vim.inspect(res))
+  return api.new(current_host)
 end
 
-function M.new_issue()
-  local NewIssue = require("mantis.ui.new_issue")
-
-  NewIssue.render({
-    host = current_host,
-    on_create_issue = function(data)
-      M.create_issue(data)
-    end
-  })
-end
-
-function M.view_issue(id)
-  if mantis == nil then
-    return
-  end
-
-  -- local ViewIssue = require("mantis.ui.view_issue")
-
-  -- call it with : so self is passed
-  local res = mantis:get_issue(id)
-  local issue = (res and res.issues[1]) or {}
-  print(vim.inspect(issue))
-
-  -- ViewIssue.render({
-  --   host = current_host,
-  --   issue = issue,
-  -- })
-end
-
-function M.view_issues(page, assigned)
-  if assigned == nil then
-    assigned = false
-  end
-  if mantis == nil then
-    return
-  end
-
+-- view MantisBT issues table
+function M.view_issues(page)
+  local page_size = config.options.view_issues.page_size
   local ViewIssues = require("mantis.ui.view_issues")
-  local res = (assigned and mantis.get_my_assigned_issues(page, page_size)) or mantis.get_issues(page, page_size)
+  local res = _mantis().get_issues(page, page_size)
   local issues = (res and res.issues) or {}
   local has_prev_page = (issues and page ~= 1 and true) or false
   local has_next_page = (issues and #issues == page_size and true) or false
 
   -- show view issues
   ViewIssues.render({
-    host = current_host,
-    url = config.options.hosts[current_host].url,
-    assigned = assigned,
+    page = page,
+    host = config.options.hosts[current_host],
+    options = config.options.view_issues,
     issues = issues,
+    on_change_status = function(id, cb)
+      M.change_status(id, cb)
+    end,
     has_prev_page = has_prev_page,
     has_next_page = has_next_page,
-    on_view_issue = function(id)
-      M.view_issue(id)
-    end,
-    on_view_issues = function()
-      M.view_issues(1)
-    end,
-    on_assigned_issues = function()
-      M.view_issues(1, true)
-    end,
-    on_new_issue = function()
-      M.new_issue()
-    end
   })
 end
 
+-- change the status of a MantisBT issue
+function M.change_status(id, cb)
+  local statuses = {
+    "new",
+    "feedback",
+    "acknowledged",
+    "confirmed",
+    "resolved",
+    "closed",
+  }
+  vim.ui.select(statuses, { prompt = "Select a status" }, function(status)
+    local updated_status = _mantis():update_issue(id, {
+      status = {
+        name = status
+      }
+    })
+
+    if cb then
+      cb(updated_status)
+    end
+  end)
+end
+
+-- select a host from the config
 function M.host_select()
-  local HostSelect = require("mantis.ui.host_select")
+  local HostSelect = require("mantis.ui.selector")
   local count = vim.tbl_count(hosts)
 
   -- no hosts
@@ -101,17 +78,18 @@ function M.host_select()
   if count == 1 then
     local host, _ = next(hosts)
     _set_host(host)
-    M.view_issues(1)
+    M.view_issues(current_page)
     return
   end
 
   -- multiple hosts, open select UI
   HostSelect.render({
-    hosts = hosts,
-    on_submit = function(host)
-      -- store the host table
-      _set_host(host)
-      M.view_issues(1)
+    title = "Select MantisBT Host",
+    options = config.options.selector,
+    items = hosts,
+    on_submit = function(id)
+      _set_host(id)
+      M.view_issues(current_page)
     end,
   })
 end

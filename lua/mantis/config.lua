@@ -3,23 +3,17 @@ local M = {}
 M.options = {
   debug = false,
   hosts = {},
-  new_issue = {
+  selector = {
     ui = {
-      width = 90,
-      height = 20,
-    },
-  },
-  view_issue = {
-    ui = {
-      width = 150,
-      height = 20,
-    },
+      width = 50,
+      height = 10,
+    }
   },
   view_issues = {
-    page_size = 50,
+    page_size = 20,
     ui = {
-      width = 150,
-      height = 80,
+      width = 120,
+      height = 18,
     },
   }
 }

@@ -5,6 +5,10 @@ function M.truncate(str, width)
   return str:sub(1, width - 1) .. "…"
 end
 
+function M.debug(o)
+  print(vim.inspect(o))
+end
+
 local timezone_offset = (function()
   local now = os.time()
   local local_t = os.date("*t", now)

@@ -1,31 +1,25 @@
 local M = {}
 local n = require("nui-components")
 
-function M.render(opts)
-  local hosts = opts.hosts
-  local on_submit = opts.on_submit
-
-  -- build select options
+function M.render(props)
   local options = {}
-  for name, _ in pairs(hosts) do
+  for name, _ in pairs(props.items) do
     table.insert(options, n.option(name, { id = name }))
   end
 
-  -- default selection = first host key
-  local default = next(hosts)
+  local default = next(props.items)
   local signal = n.create_signal({
-    selected = default, -- string ID of host
+    selected = default,
   })
 
   -- window
   local renderer = n.create_renderer({
-    width = 50,
-    height = 10,
+    width = props.options.ui.width,
+    height = props.options.ui.height,
   })
 
-  -- define select
   local select = n.select({
-    border_label = "Select Mantis Host",
+    border_label = props.title,
     selected = signal.selected,
     data = options,
     multiselect = false,
@@ -33,24 +27,19 @@ function M.render(opts)
       signal.selected = node.id
     end,
     on_select = function(node)
-      if on_submit then
-        on_submit(node.id)
-      end
+      props.on_submit(node.id)
       renderer:close()
     end
   })
 
-  -- layout
   local body = function()
     return n.rows(
       select
     )
   end
 
-  -- render
   renderer:render(body)
 
--- autofocus the select
   vim.schedule(function()
     select:focus()
   end)

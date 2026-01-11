@@ -1,180 +1,103 @@
 local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
-local config = require("mantis.config")
 
-function M.render(opts)
+local function build_nodes(issues)
+  local nodes = {}
+  for _, issue in ipairs(issues) do
+    nodes[#nodes + 1] = n.node({ issue = issue })
+  end
+  return nodes
+end
+
+function M.render(props)
   local signal       = n.create_signal({
-    keymaps_hidden = true
+    selected = nil,
+    issues = props.issues,
   })
-
-  local TOTAL_WIDTH  = config.options.view_issues.ui.width
-  local TOTAL_HEIGHT = config.options.view_issues.ui.height
-  local COL_ID       = 8
-  local COL_STATUS   = math.floor((TOTAL_WIDTH + 15) * 0.15)
-  local COL_CONTEXT  = math.floor((TOTAL_WIDTH + 15) * 0.18)
-  local COL_SUMMARY  = math.floor((TOTAL_WIDTH + 20) * 0.3)
-  local COL_CREATED  = math.floor((TOTAL_WIDTH) * 0.1)
-  local COL_UPDATED  = math.floor((TOTAL_WIDTH) * 0.1)
 
   local renderer     = n.create_renderer({
-    width = TOTAL_WIDTH,
-    height = TOTAL_HEIGHT,
+    width = props.options.ui.width,
+    height = props.options.ui.height,
   })
 
-  local lines        = {}
-  for _, issue in ipairs(opts.issues) do
-    -- status hl
-    local status_hl_group = "MantisStatus_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_hl_group, { bg = issue.status.color, fg = "#222222" })
-
-    -- format values
-    local status  = util.truncate(issue.status.label .. ' (' .. issue.handler.name .. ')', COL_STATUS)
-    local context = util.truncate('[' .. issue.project.name .. '] ' .. issue.category.name, COL_CONTEXT)
-    local summary = util.truncate(issue.summary, COL_SUMMARY)
-    local created = util.time_ago(util.parse_iso8601(issue.created_at))
-    local updated = util.time_ago(util.parse_iso8601(issue.updated_at))
-
-    table.insert(lines, n.line(
-      n.text(string.format("%-" .. COL_ID .. "s ", string.format("%07d", issue.id)), "String"),
-      n.text(string.format(" %-" .. COL_STATUS .. "s ", status), status_hl_group),
-      n.text(string.format(" %-" .. COL_CONTEXT .. "s ", context), "Keyword"),
-      n.text(string.format(" %-" .. COL_SUMMARY .. "s ", summary)),
-      n.text(string.format(" %-" .. COL_CREATED .. "s ", created), "Comment"),
-      n.text(string.format(" %-" .. COL_UPDATED .. "s", updated), "Comment")
-    ))
-  end
-
-  -- issue rows
-  local para = n.paragraph({
-    border_label = string.format("%s Mantis Issues [%s]", (opts.assigned and "Assigned") or "All", opts.host),
+  local tree         = n.tree({
+    flex = 1,
     autofocus = true,
-    max_lines = TOTAL_HEIGHT,
-    lines = lines,
+    border_label = "MantisBT Issues",
+    data = build_nodes(signal.issues:get_value()),
     on_focus = function(state)
       vim.wo[state.winid].cursorline = true
-
-      vim.keymap.set("n", "?", function()
-        signal.keymaps_hidden = not signal.keymaps_hidden:get_value()
-      end, { buffer = state.bufnr })
-
-      vim.keymap.set("n", "<CR>", function()
-        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        local issue = opts.issues[current_line]
-        opts.on_view_issue(issue.id)
-        -- renderer:close()
-      end, { buffer = state.bufnr })
-
+      -- Open issue in browser
       vim.keymap.set("n", "o", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
-        local issue = opts.issues[current_line]
-        local url = opts.url .. '/view.php?id=' .. issue.id
-        vim.system({'xdg-open', url}, { detach = true })
+        local issue = signal.issues:get_value()[current_line]
+        local url = props.host.url .. '/view.php?id=' .. issue.id
+        vim.system({ 'xdg-open', url }, { detach = true })
       end, { buffer = state.bufnr })
-    end
-  })
 
-  -- view toggles
-  local all_issues = n.button({
-    hidden = true,
-    label = "All Issues",
-    global_press_key = "v",
-    on_press = function()
-      opts.on_view_issues()
-      renderer:close()
+      vim.keymap.set("n", "s", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        local issue = signal.issues:get_value()[current_line]
+        props.on_change_status(issue.id, function(updated_issue)
+          local issues = vim.deepcopy(signal.issues:get_value())
+          issues[current_line] = updated_issue
+          -- update trigger
+          signal:set_value({ issues = issues })
+        end)
+      end, { buffer = state.bufnr })
+
+      vim.keymap.set("n", "q", function()
+        renderer:close()
+      end, { buffer = state.bufnr })
+    end,
+    on_select = function(node, component)
+      signal.selected = node.issue.id
+      print(node.issue.id)
+    end,
+    prepare_node = function(node, line, component)
+      local issue = node.issue
+
+      local id = n.text(string.format("%-7s ", string.format("%07d", issue.id)), "Constant")
+      line:append(id)
+
+      local severity = n.text(string.format("%-10s ", issue.severity.label), "String")
+      line:append(severity)
+
+      local status_hl_group = "MantisStatus_" .. issue.status.label
+      vim.api.nvim_set_hl(0, status_hl_group, { bg = issue.status.color, fg = "#222222" })
+      local status = n.text(
+        string.format("%-23s", issue.status.label .. ' (' .. util.truncate(issue.handler.name, 8) .. ')'),
+        status_hl_group)
+      line:append(status)
+
+      local project_category = util.truncate("[" .. issue.project.name .. "] " .. issue.category.name, 32)
+      local context = n.text(string.format(" %-32s", project_category))
+      line:append(context)
+
+      local summary = n.text(string.format(" %-32s", util.truncate(issue.summary, 32)))
+      line:append(summary)
+
+      local updated = n.text(string.format(" %-10s", util.time_ago(util.parse_iso8601(issue.updated_at))), "Comment")
+      line:append(updated)
+
+      return line
     end,
   })
 
-  local assigned_issues = n.button({
-    hidden = true,
-    label = "Assigned Issues",
-    global_press_key = "v",
-    on_press = function()
-      opts.on_assigned_issues()
-      renderer:close()
-    end,
-  })
-
-  local btn_view = (opts.assigned and all_issues) or assigned_issues
-
-  local btn_assign_user = n.button({
-    hidden = true,
-    label = "Assign",
-    global_press_key = "a",
-    on_press = function()
-      print("WIP: assign")
-    end,
-  })
-
-  local btn_change_status = n.button({
-    hidden = true,
-    label = "Status",
-    global_press_key = "s",
-    on_press = function()
-      print("WIP: status")
-    end,
-  })
-
-  local btn_new_issue = n.button({
-    hidden = true,
-    label = "New Issue",
-    global_press_key = "n",
-    on_press = function()
-      opts.on_new_issue()
-      renderer:close()
-    end,
-  })
-
-  -- quit
-  local btn_quit = n.button({
-    hidden = true,
-    label = "Quit",
-    global_press_key = "q",
-    on_press = function()
-      renderer:close()
-    end,
-  })
-
-  -- helper
-  local keymaps = {
-    "a Assign",
-    "s Status",
-    "n New",
-    "o Open issue in browser",
-    "v Toggle view",
-    "q Quit",
-  }
-  local helper = n.paragraph({
-    hidden = signal.keymaps_hidden,
-    border_label = string.format("Keymaps", opts.host),
-    autofocus = false,
-    max_lines = 10,
-    align = 'center',
-    lines = {
-      n.line(n.text(table.concat(keymaps, " | "), "Comment"))
-    }
-  })
+  local subscription = signal:observe(function(prev, current)
+    print("Something changed!")
+    renderer:redraw()
+  end)
 
   -- layout
-  local body = function()
-    return n.box(
-      { flex = 1, direction = "column" },
-      n.box(
-        { flex = 0, direction = "column" },
-        para
-      ),
-      n.box(
-        { flex = 0, direction = "column" },
-        helper
-      ),
-      n.box(
-        { flex = 0, direction = "row" },
-        btn_new_issue, btn_view, btn_assign_user, btn_change_status, btn_quit
-      )
-    )
-  end
+  local body         = n.rows(tree)
 
   renderer:render(body)
+
+  renderer:on_unmount(function()
+    subscription:unsubscribe()
+  end)
 end
 
 return M
