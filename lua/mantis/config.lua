@@ -10,10 +10,9 @@ M.options = {
     }
   },
   view_issues = {
-    page_size = 20,
     ui = {
       width = 120,
-      height = 18,
+      height = 15,
     },
   }
 }

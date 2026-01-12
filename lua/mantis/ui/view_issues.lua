@@ -27,6 +27,31 @@ local function _render_tree(props)
     data = build_nodes(props.issues),
     on_focus = function(state)
       vim.wo[state.winid].cursorline = true
+
+      vim.keymap.set("n", "r", function()
+        props.on_refresh(function()
+          renderer:close()
+        end)
+      end, { buffer = state.bufnr })
+
+      if props.has_prev_page then
+        -- prev page
+        vim.keymap.set("n", "[", function()
+          props.on_prev_page(function()
+            renderer:close()
+          end)
+        end, { buffer = state.bufnr })
+      end
+
+      if props.has_next_page then
+        -- next page
+        vim.keymap.set("n", "]", function()
+          props.on_next_page(function()
+            renderer:close()
+          end)
+        end, { buffer = state.bufnr })
+      end
+
       -- open issue in browser
       vim.keymap.set("n", "o", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
@@ -61,6 +86,9 @@ local function _render_tree(props)
       vim.keymap.set("n", "q", function()
         renderer:close()
       end, { buffer = state.bufnr })
+    end,
+    on_mount = function(component)
+      component:set_border_text("bottom", "Page: " .. props.page, "right")
     end,
     on_select = function(node, component)
       signal.selected = node.issue.id

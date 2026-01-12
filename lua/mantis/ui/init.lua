@@ -1,11 +1,12 @@
 local M = {}
 
+local util = require("mantis.util")
 local config = require("mantis.config")
 local api = require("mantis.api")
-local util = require("mantis.util")
 local current_host = nil
 local current_page = 1
 local hosts = config.options.hosts
+local page_size = config.options.view_issues.ui.height - 2
 
 local function _set_host(host)
   current_host = host
@@ -19,17 +20,16 @@ local function _mantis()
 end
 
 -- view MantisBT issues table
-function M.view_issues(page)
-  local page_size = config.options.view_issues.page_size
+function M.view_issues()
   local ViewIssues = require("mantis.ui.view_issues")
-  local res = _mantis().get_issues(page, page_size)
+  local res = _mantis():get_issues(page_size, current_page)
   local issues = (res and res.issues) or {}
-  local has_prev_page = (issues and page ~= 1 and true) or false
+  local has_prev_page = (issues and current_page ~= 1 and true) or false
   local has_next_page = (issues and #issues == page_size and true) or false
 
   -- show view issues
   ViewIssues.render({
-    page = page,
+    page = current_page,
     host = config.options.hosts[current_host],
     options = config.options.view_issues,
     issues = issues,
@@ -39,9 +39,54 @@ function M.view_issues(page)
     on_assign_user = function(issue_id, project_id, cb)
       M.assign_user(issue_id, project_id, cb)
     end,
+    on_prev_page = function(cb)
+      if has_prev_page then
+        M.prev_page(cb)
+      end
+    end,
+    on_next_page = function(cb)
+      if has_next_page then
+        M.next_page(cb)
+      end
+    end,
+    on_refresh = function(cb)
+      M.refresh(cb)
+    end,
     has_prev_page = has_prev_page,
     has_next_page = has_next_page,
   })
+end
+
+function M.refresh(cb)
+  local res = _mantis():get_issues(page_size, current_page)
+  local issues = (res and res.issues) or {}
+  if issues and cb then
+    vim.notify("MantisBT issues refreshed", vim.log.levels.INFO)
+    M.view_issues()
+    cb()
+  end
+end
+
+function M.prev_page(cb)
+  local prev_page = current_page - 1
+  local res = _mantis():get_issues(page_size, prev_page)
+  local issues = (res and res.issues) or {}
+  if issues and cb then
+    current_page = prev_page
+    M.view_issues()
+    cb()
+  end
+end
+
+function M.next_page(cb)
+  local next_page = current_page + 1
+  local res = _mantis():get_issues(page_size, next_page)
+  local issues = (res and res.issues) or {}
+  if issues and cb then
+    current_page = next_page
+    M.view_issues()
+    cb()
+  end
 end
 
 -- assign a user to a MantisBT issue
@@ -103,7 +148,7 @@ function M.host_select()
   if count == 1 then
     local host, _ = next(hosts)
     _set_host(host)
-    M.view_issues(current_page)
+    M.view_issues()
     return
   end
 
@@ -114,7 +159,7 @@ function M.host_select()
     items = hosts,
     on_submit = function(id)
       _set_host(id)
-      M.view_issues(current_page)
+      M.view_issues()
     end,
   })
 end
