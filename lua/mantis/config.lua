@@ -12,7 +12,7 @@ M.options = {
   view_issues = {
     ui = {
       width = 120,
-      height = 15,
+      height = 22,
     },
   }
 }

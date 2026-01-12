@@ -104,7 +104,7 @@ function M.assign_user(issue_id, project_id, cb)
       }
     })
 
-    if cb then
+    if name and cb then
       cb(updated_issue)
     end
   end)
@@ -127,7 +127,7 @@ function M.change_status(issue_id, cb)
       }
     })
 
-    if cb then
+    if status and cb then
       cb(updated_issue)
     end
   end)

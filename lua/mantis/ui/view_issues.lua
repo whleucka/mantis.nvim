@@ -28,32 +28,33 @@ local function _render_tree(props)
     on_focus = function(state)
       vim.wo[state.winid].cursorline = true
 
+      -- refresh issues view
       vim.keymap.set("n", "r", function()
         props.on_refresh(function()
           renderer:close()
         end)
       end, { buffer = state.bufnr })
 
-      if props.has_prev_page then
-        -- prev page
-        vim.keymap.set("n", "[", function()
-          props.on_prev_page(function()
-            renderer:close()
-          end)
+        -- issues prev page
+        vim.keymap.set("n", "[p", function()
+          if props.has_prev_page then
+            props.on_prev_page(function()
+              renderer:close()
+            end)
+          end
         end, { buffer = state.bufnr })
-      end
 
-      if props.has_next_page then
-        -- next page
-        vim.keymap.set("n", "]", function()
+        -- issues next page
+        vim.keymap.set("n", "]p", function()
           props.on_next_page(function()
-            renderer:close()
+            if props.has_next_page then
+              renderer:close()
+            end
           end)
         end, { buffer = state.bufnr })
-      end
 
       -- open issue in browser
-      vim.keymap.set("n", "o", function()
+      vim.keymap.set("n", "gx", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
@@ -61,7 +62,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- assign user
-      vim.keymap.set("n", "a", function()
+      vim.keymap.set("n", "ga", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         props.on_assign_user(issue.id, issue.project.id, function(updated_issue)
@@ -72,7 +73,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- change status
-      vim.keymap.set("n", "s", function()
+      vim.keymap.set("n", "gs", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         props.on_change_status(issue.id, function(updated_issue)
