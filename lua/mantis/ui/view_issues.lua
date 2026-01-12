@@ -31,8 +31,19 @@ local function _render_tree(props)
       vim.keymap.set("n", "o", function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
-        local url = props.host.url .. '/view.php?id=' .. issue.id
+        local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
         vim.system({ 'xdg-open', url }, { detach = true })
+      end, { buffer = state.bufnr })
+
+      -- assign user
+      vim.keymap.set("n", "a", function()
+        local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
+        local issue = props.issues[current_line]
+        props.on_assign_user(issue.id, issue.project.id, function(updated_issue)
+          props.issues[current_line] = updated_issue.issues[1]
+          renderer:close()
+          _render_tree(props)
+        end)
       end, { buffer = state.bufnr })
 
       -- change status

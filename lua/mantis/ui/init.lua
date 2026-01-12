@@ -2,6 +2,7 @@ local M = {}
 
 local config = require("mantis.config")
 local api = require("mantis.api")
+local util = require("mantis.util")
 local current_host = nil
 local current_page = 1
 local hosts = config.options.hosts
@@ -32,17 +33,41 @@ function M.view_issues(page)
     host = config.options.hosts[current_host],
     options = config.options.view_issues,
     issues = issues,
-    on_change_status = function(id, cb)
-      M.change_status(id, cb)
+    on_change_status = function(issue_id, cb)
+      M.change_status(issue_id, cb)
+    end,
+    on_assign_user = function(issue_id, project_id, cb)
+      M.assign_user(issue_id, project_id, cb)
     end,
     has_prev_page = has_prev_page,
     has_next_page = has_next_page,
   })
 end
 
+-- assign a user to a MantisBT issue
+function M.assign_user(issue_id, project_id, cb)
+  local res = _mantis():get_project_users(project_id)
+  local users = (res and res.users) or {}
+  local options = {}
+  for _,user in ipairs(users) do
+    table.insert(options, user.name)
+  end
+  vim.ui.select(options, { prompt = "Select a user" }, function(name)
+    local updated_issue = _mantis():update_issue(issue_id, {
+      handler = {
+        name = name
+      }
+    })
+
+    if cb then
+      cb(updated_issue)
+    end
+  end)
+end
+
 -- change the status of a MantisBT issue
-function M.change_status(id, cb)
-  local statuses = {
+function M.change_status(issue_id, cb)
+  local options = {
     "new",
     "feedback",
     "acknowledged",
@@ -50,15 +75,15 @@ function M.change_status(id, cb)
     "resolved",
     "closed",
   }
-  vim.ui.select(statuses, { prompt = "Select a status" }, function(status)
-    local updated_status = _mantis():update_issue(id, {
+  vim.ui.select(options, { prompt = "Select a status" }, function(status)
+    local updated_issue = _mantis():update_issue(issue_id, {
       status = {
         name = status
       }
     })
 
     if cb then
-      cb(updated_status)
+      cb(updated_issue)
     end
   end)
 end
