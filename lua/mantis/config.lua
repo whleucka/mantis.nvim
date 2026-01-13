@@ -10,7 +10,7 @@ M.options = {
     }
   },
   view_issues = {
-    limit = 20,
+    limit = 40,
     ui = {
       width = 150,
       height = 50,
@@ -25,12 +25,12 @@ M.options = {
       }
     },
     keymap = {
-      refresh = "gr",
-      next_page = "gn",
-      prev_page = "gp",
+      next_page = ">",
+      prev_page = "<",
       open_issue = "gx",
       assign_issue = "ga",
       change_status = "gs",
+      refresh = "r",
       quit = "q",
     }
   }
