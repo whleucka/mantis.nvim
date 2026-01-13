@@ -14,6 +14,12 @@ M.options = {
       width = 120,
       height = 22,
     },
+    keymap = {
+      open_issue_in_browser = "gx",
+      assign_issue_to_user = "ga",
+      change_status = "gs",
+      quit = "q",
+    }
   }
 }
 

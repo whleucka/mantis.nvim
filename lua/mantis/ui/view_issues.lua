@@ -36,7 +36,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- issues prev page
-      vim.keymap.set("n", "[p", function()
+      vim.keymap.set("n", "n", function()
         if props.has_prev_page then
           props.on_prev_page(function()
             renderer:close()
@@ -45,7 +45,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- issues next page
-      vim.keymap.set("n", "]p", function()
+      vim.keymap.set("n", "p", function()
         props.on_next_page(function()
           if props.has_next_page then
             renderer:close()
@@ -54,7 +54,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- open issue in browser
-      vim.keymap.set("n", "gx", function()
+      vim.keymap.set("n", props.options.keymap.open_issue_in_browser, function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
@@ -62,7 +62,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- assign user
-      vim.keymap.set("n", "ga", function()
+      vim.keymap.set("n", props.options.keymap.assign_issue_to_user, function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         props.on_assign_user(issue.id, issue.project.id, function(updated_issue)
@@ -73,7 +73,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- change status
-      vim.keymap.set("n", "gs", function()
+      vim.keymap.set("n", props.options.keymap.change_status, function()
         local current_line = vim.api.nvim_win_get_cursor(state.winid)[1]
         local issue = props.issues[current_line]
         props.on_change_status(issue.id, function(updated_issue)
@@ -84,7 +84,7 @@ local function _render_tree(props)
       end, { buffer = state.bufnr })
 
       -- quit with 'q'
-      vim.keymap.set("n", "q", function()
+      vim.keymap.set("n", props.options.keymap.quit, function()
         renderer:close()
       end, { buffer = state.bufnr })
     end,
