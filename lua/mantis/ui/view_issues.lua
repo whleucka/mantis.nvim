@@ -35,23 +35,23 @@ local function _render_tree(props)
         end)
       end, { buffer = state.bufnr })
 
-        -- issues prev page
-        vim.keymap.set("n", "[p", function()
-          if props.has_prev_page then
-            props.on_prev_page(function()
-              renderer:close()
-            end)
-          end
-        end, { buffer = state.bufnr })
-
-        -- issues next page
-        vim.keymap.set("n", "]p", function()
-          props.on_next_page(function()
-            if props.has_next_page then
-              renderer:close()
-            end
+      -- issues prev page
+      vim.keymap.set("n", "[p", function()
+        if props.has_prev_page then
+          props.on_prev_page(function()
+            renderer:close()
           end)
-        end, { buffer = state.bufnr })
+        end
+      end, { buffer = state.bufnr })
+
+      -- issues next page
+      vim.keymap.set("n", "]p", function()
+        props.on_next_page(function()
+          if props.has_next_page then
+            renderer:close()
+          end
+        end)
+      end, { buffer = state.bufnr })
 
       -- open issue in browser
       vim.keymap.set("n", "gx", function()
