@@ -6,7 +6,7 @@ local api = require("mantis.api")
 local current_host = nil
 local current_page = 1
 local hosts = config.options.hosts
-local page_size = config.options.view_issues.ui.height - 2
+local page_size = config.options.view_issues.limit
 
 local function _set_host(host)
   current_host = host
@@ -98,14 +98,15 @@ function M.assign_user(issue_id, project_id, cb)
     table.insert(options, user.name)
   end
   vim.ui.select(options, { prompt = "Select a user" }, function(name)
-    local updated_issue = _mantis():update_issue(issue_id, {
+    _mantis():update_issue(issue_id, {
       handler = {
         name = name
       }
     })
 
     if name and cb then
-      cb(updated_issue)
+      M.view_issues()
+      cb()
     end
   end)
 end
@@ -121,14 +122,15 @@ function M.change_status(issue_id, cb)
     "closed",
   }
   vim.ui.select(options, { prompt = "Select a status" }, function(status)
-    local updated_issue = _mantis():update_issue(issue_id, {
+    _mantis():update_issue(issue_id, {
       status = {
         name = status
       }
     })
 
     if status and cb then
-      cb(updated_issue)
+      M.view_issues()
+      cb()
     end
   end)
 end

@@ -10,13 +10,26 @@ M.options = {
     }
   },
   view_issues = {
+    limit = 20,
     ui = {
-      width = 120,
-      height = 22,
+      width = 150,
+      height = 50,
+      column_width = {
+        s_color = "%1s ",
+        id = "%07d ",
+        severity = "%-9s ",
+        status = "%-24s",
+        category = "%-12s ",
+        summary = "%-70s ",
+        updated = "%10s"
+      }
     },
     keymap = {
-      open_issue_in_browser = "gx",
-      assign_issue_to_user = "ga",
+      refresh = "gr",
+      next_page = "gn",
+      prev_page = "gp",
+      open_issue = "gx",
+      assign_issue = "ga",
       change_status = "gs",
       quit = "q",
     }
