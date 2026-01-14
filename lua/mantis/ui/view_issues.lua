@@ -134,9 +134,6 @@ local function _render_tree(props)
     end,
     on_mount = function(component)
       component:set_border_text("bottom", "[h]elp", "left")
-      if props.has_next_page then
-        component:set_border_text("bottom", "Page: " .. props.page, "right")
-      end
     end,
     on_select = function(node, component)
       local type = node.type
