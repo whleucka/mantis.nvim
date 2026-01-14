@@ -147,12 +147,12 @@ local function _render_tree(props)
 
       if type == 'project' then
         local project = node.project
-        line:append(n.text(string.format("  %s (%d)", project.name, node.count), "Function"))
+        line:append(n.text(string.format("└──  %s (%d)", project.name, node.count), "Function"))
       elseif type == 'issue' then
         local issue = node.issue
         local column_width = props.options.ui.column_width
 
-        line:append(n.text("   └── ", "Comment"))
+        line:append(n.text("  └── ", "Function"))
 
         local status_bg = "MantisStatusBg_" .. issue.status.label
         vim.api.nvim_set_hl(0, status_bg, { bg = issue.status.color })

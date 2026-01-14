@@ -31,8 +31,8 @@ M.options = {
       }
     },
     keymap = {
-      next_page = "]p",
-      prev_page = "[p",
+      next_page = "]]",
+      prev_page = "[[",
       create_issue = "gc",
       open_issue = "gx",
       assign_issue = "ga",
