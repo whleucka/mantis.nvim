@@ -122,7 +122,7 @@ local function _render_tree(props)
       end
     end,
     on_select = function(node, component)
-      print(node.issue.id)
+      -- print(node.issue.id)
     end,
     prepare_node = function(node, line, component)
       local type = node.type
