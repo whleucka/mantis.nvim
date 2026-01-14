@@ -16,6 +16,8 @@ local function build_nodes(issues)
   end
 
   local nodes = {}
+
+  -- flatten issues
   for _, entry in pairs(projects) do
     -- sort issues by updated_at
     table.sort(entry.issues, function(a, b)
@@ -122,7 +124,11 @@ local function _render_tree(props)
       end
     end,
     on_select = function(node, component)
-      -- print(node.issue.id)
+      local type = node.type
+      if type == 'project' then
+        node.expanded = not node.expanded
+        util.debug(node.expanded)
+      end
     end,
     prepare_node = function(node, line, component)
       local type = node.type
@@ -141,28 +147,45 @@ local function _render_tree(props)
         local status_fg = "MantisStatusFg_" .. issue.status.label
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
-        local s_colour = n.text(string.format(column_width.s_color, "●"), status_fg)
-        line:append(s_colour)
+        if column_width.s_color then
+          local s_colour = n.text(string.format("%"..column_width.s_color.."s ", "●"), status_fg)
+          line:append(s_colour)
+        end
 
-        local id = n.text(string.format(column_width.id, issue.id), status_fg)
-        line:append(id)
+        if column_width.id then
+          local id = n.text(string.format("%0"..column_width.id.."d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
+          line:append(id)
+        end
 
-        local severity = n.text(string.format(column_width.severity, "[" .. util.truncate(issue.severity.label, 8) .. "]"), status_fg)
-        line:append(severity)
+        if column_width.severity then
+          local severity_text = "[" .. issue.severity.label .. "]"
+          local severity = n.text(string.format("%-"..column_width.severity.."s ", util.truncate(severity_text, column_width.severity)), status_fg)
+          line:append(severity)
+        end
 
-        local handler = issue.handler and issue.handler.name or 'n/a'
-        local status = n.text(
-        string.format(column_width.status, issue.status.label .. ' (' .. util.truncate(handler, 8) .. ')'), status_fg)
-        line:append(status)
+        if column_width.status then
+          local handler = issue.handler and issue.handler.name or 'n/a'
+          local status_text = issue.status.label .. ' (' .. handler .. ')'
+          local status = n.text(
+          string.format("%-"..column_width.status.."s ", util.truncate(status_text, column_width.status)), status_fg)
+          line:append(status)
+        end
 
-        local category = n.text(string.format(column_width.category, util.truncate(issue.category.name, 12)), "Identifier")
-        line:append(category)
+        if column_width.category then
+          local category = n.text(string.format("%-"..column_width.category.."s ", util.truncate(issue.category.name, column_width.category)), "Identifier")
+          line:append(category)
+        end
 
-        local summary = n.text(string.format(column_width.summary, util.truncate(issue.summary, 70)))
-        line:append(summary)
+        if column_width.summary then
+          local summary = n.text(string.format("%-"..column_width.summary.."s ", util.truncate(issue.summary, column_width.summary)))
+          line:append(summary)
+        end
 
-        local updated = n.text(string.format(column_width.updated, util.time_ago(util.parse_iso8601(issue.updated_at))), "Comment")
-        line:append(updated)
+        if column_width.updated then
+          local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
+          local updated = n.text(string.format("%"..column_width.updated.."s", util.truncate(updated_text, column_width.updated)), "Comment")
+          line:append(updated)
+        end
       end
 
       return line

@@ -10,18 +10,18 @@ M.options = {
     }
   },
   view_issues = {
-    limit = 40,
+    limit = 20,
     ui = {
       width = 150,
-      height = 50,
+      height = 25,
       column_width = {
-        s_color = "%1s ",
-        id = "%07d ",
-        severity = "%-9s ",
-        status = "%-24s",
-        category = "%-12s ",
-        summary = "%-70s ",
-        updated = "%10s"
+        s_color = 1,
+        id = 7,
+        severity = 9,
+        status = 24,
+        category = 12,
+        summary = 70,
+        updated = 10
       }
     },
     keymap = {
