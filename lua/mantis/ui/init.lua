@@ -93,11 +93,12 @@ end
 function M.assign_user(issue_id, project_id, cb)
   local res = _mantis():get_project_users(project_id)
   local users = (res and res.users) or {}
-  local options = {}
+  local options = {'n/a'}
   for _,user in ipairs(users) do
     table.insert(options, user.name)
   end
   vim.ui.select(options, { prompt = "Select a user" }, function(name)
+    name = (name == 'n/a' and '') or name
     _mantis():update_issue(issue_id, {
       handler = {
         name = name

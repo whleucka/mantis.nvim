@@ -150,8 +150,9 @@ local function _render_tree(props)
         local severity = n.text(string.format(column_width.severity, "[" .. util.truncate(issue.severity.label, 8) .. "]"), status_fg)
         line:append(severity)
 
+        local handler = issue.handler and issue.handler.name or 'n/a'
         local status = n.text(
-        string.format(column_width.status, issue.status.label .. ' (' .. util.truncate(issue.handler.name, 8) .. ')'), status_fg)
+        string.format(column_width.status, issue.status.label .. ' (' .. util.truncate(handler, 8) .. ')'), status_fg)
         line:append(status)
 
         local category = n.text(string.format(column_width.category, util.truncate(issue.category.name, 12)), "Identifier")
