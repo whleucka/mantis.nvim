@@ -9,11 +9,17 @@ M.options = {
       height = 10,
     }
   },
+  create_issue = {
+    ui = {
+      width = 120,
+      height = 30,
+    }
+  },
   view_issues = {
-    limit = 20,
+    limit = 24,
     ui = {
       width = 150,
-      height = 25,
+      height = 34,
       column_width = {
         s_color = 1,
         id = 7,
@@ -25,12 +31,13 @@ M.options = {
       }
     },
     keymap = {
-      next_page = ">",
-      prev_page = "<",
+      next_page = "]p",
+      prev_page = "[p",
+      create_issue = "gc",
       open_issue = "gx",
       assign_issue = "ga",
       change_status = "gs",
-      refresh = "r",
+      refresh = "gr",
       quit = "q",
     }
   }

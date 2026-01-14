@@ -145,6 +145,10 @@ function M:get_all_issues()
   return call_api('issues', 'GET')
 end
 
+function M:get_all_projects()
+  return call_api('projects', 'GET')
+end
+
 function M:get_my_assigned_issues(page_size, page)
   page_size = page_size or 10
   page = page or 1

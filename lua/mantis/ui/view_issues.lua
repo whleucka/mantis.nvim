@@ -70,13 +70,13 @@ local function _render_tree(props)
         vim.keymap.set("n", props.options.keymap.open_issue, function()
           local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
           vim.system({ 'xdg-open', url }, { detach = true })
-        end)
+        end, { desc = "Open issue in browser" })
 
         -- assign user
         vim.keymap.set("n", props.options.keymap.assign_issue, function()
           props.on_assign_user(issue.id, issue.project.id, function()
             renderer:close()
-          end)
+          end, { desc = "Assign user" })
         end)
 
         -- change status
@@ -84,7 +84,7 @@ local function _render_tree(props)
           props.on_change_status(issue.id, function()
             renderer:close()
           end)
-        end)
+        end, { desc = "Change status" })
       end
     end,
     on_focus = function(state)
@@ -92,7 +92,7 @@ local function _render_tree(props)
       vim.keymap.set("n", props.options.keymap.refresh, function()
         props.on_refresh(function()
           renderer:close()
-        end)
+        end, { desc = "Refresh issues" })
       end)
 
       -- quit with 'q'
@@ -100,25 +100,32 @@ local function _render_tree(props)
         renderer:close()
       end)
 
-        -- prev page
-        vim.keymap.set("n", props.options.keymap.prev_page, function()
-          if props.has_prev_page then
-            props.on_prev_page(function()
-              renderer:close()
-            end)
+      -- create new issue
+      vim.keymap.set("n", props.options.keymap.create_issue, function()
+        props.on_create_issue()
+        renderer:close()
+      end, { desc = "Create new issue" })
+
+      -- prev page
+      vim.keymap.set("n", props.options.keymap.prev_page, function()
+        if props.has_prev_page then
+          props.on_prev_page(function()
+            renderer:close()
+          end)
+        end
+      end, { desc = "Prev page" })
+
+      -- next page
+      vim.keymap.set("n", props.options.keymap.next_page, function()
+        props.on_next_page(function()
+          if props.has_next_page then
+            renderer:close()
           end
         end)
-
-        -- next page
-        vim.keymap.set("n", props.options.keymap.next_page, function()
-          props.on_next_page(function()
-            if props.has_next_page then
-              renderer:close()
-            end
-          end)
-        end)
+      end, { desc = "Next page" })
     end,
     on_mount = function(component)
+      component:set_border_text("bottom", "[h]elp", "left")
       if props.has_next_page then
         component:set_border_text("bottom", "Page: " .. props.page, "right")
       end
@@ -148,18 +155,21 @@ local function _render_tree(props)
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
         if column_width.s_color then
-          local s_colour = n.text(string.format("%"..column_width.s_color.."s ", "●"), status_fg)
+          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", "●"), status_fg)
           line:append(s_colour)
         end
 
         if column_width.id then
-          local id = n.text(string.format("%0"..column_width.id.."d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
+          local id = n.text(
+          string.format("%0" .. column_width.id .. "d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
           line:append(id)
         end
 
         if column_width.severity then
           local severity_text = "[" .. issue.severity.label .. "]"
-          local severity = n.text(string.format("%-"..column_width.severity.."s ", util.truncate(severity_text, column_width.severity)), status_fg)
+          local severity = n.text(
+          string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
+            status_fg)
           line:append(severity)
         end
 
@@ -167,23 +177,28 @@ local function _render_tree(props)
           local handler = issue.handler and issue.handler.name or 'n/a'
           local status_text = issue.status.label .. ' (' .. handler .. ')'
           local status = n.text(
-          string.format("%-"..column_width.status.."s ", util.truncate(status_text, column_width.status)), status_fg)
+            string.format("%-" .. column_width.status .. "s ", util.truncate(status_text, column_width.status)),
+            status_fg)
           line:append(status)
         end
 
         if column_width.category then
-          local category = n.text(string.format("%-"..column_width.category.."s ", util.truncate(issue.category.name, column_width.category)), "Identifier")
+          local category = n.text(
+          string.format("%-" .. column_width.category .. "s ", util.truncate(issue.category.name, column_width.category)),
+            "Identifier")
           line:append(category)
         end
 
         if column_width.summary then
-          local summary = n.text(string.format("%-"..column_width.summary.."s ", util.truncate(issue.summary, column_width.summary)))
+          local summary = n.text(string.format("%-" .. column_width.summary .. "s ",
+            util.truncate(issue.summary, column_width.summary)))
           line:append(summary)
         end
 
         if column_width.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
-          local updated = n.text(string.format("%"..column_width.updated.."s", util.truncate(updated_text, column_width.updated)), "Comment")
+          local updated = n.text(
+          string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)), "Comment")
           line:append(updated)
         end
       end

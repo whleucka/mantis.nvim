@@ -5,7 +5,7 @@ function M.truncate(str, width)
   return str:sub(1, width - 1) .. "…"
 end
 
-function M.debug(o)
+function M.print(o)
   print(vim.inspect(o))
 end
 
