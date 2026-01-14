@@ -46,6 +46,7 @@ function M.create_issue()
       users = users,
       options = config.options.create_issue,
       on_submit = function(new_issue)
+        util.print(new_issue)
         _mantis():create_issue(new_issue)
         M.view_issues()
       end

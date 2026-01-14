@@ -49,6 +49,7 @@ end
 local function _render_tree(props)
   local signal   = n.create_signal({
     selected = nil,
+    show_help = false,
   })
 
   local renderer = n.create_renderer({
@@ -88,12 +89,18 @@ local function _render_tree(props)
       end
     end,
     on_focus = function(state)
+      -- show help
+      vim.keymap.set("n", "h", function()
+        local show = signal.show_help:get_value()
+        signal.show_help = not show
+      end)
+
       -- refresh issues view
       vim.keymap.set("n", props.options.keymap.refresh, function()
         props.on_refresh(function()
           renderer:close()
-        end, { desc = "Refresh issues" })
-      end)
+        end)
+      end, { desc = "Refresh issues" })
 
       -- quit with 'q'
       vim.keymap.set("n", props.options.keymap.quit, function()
@@ -123,6 +130,7 @@ local function _render_tree(props)
           end
         end)
       end, { desc = "Next page" })
+
     end,
     on_mount = function(component)
       component:set_border_text("bottom", "[h]elp", "left")
@@ -204,9 +212,17 @@ local function _render_tree(props)
       end
 
       return line
+
     end,
   })
-  renderer:render(n.rows(tree))
+  renderer:render(n.rows(
+    tree,
+    n.paragraph({
+      hidden = signal.show_help:negate(),
+      lines = "quit: q",
+      align = "center"
+    })
+  ))
 end
 
 function M.render(props)
