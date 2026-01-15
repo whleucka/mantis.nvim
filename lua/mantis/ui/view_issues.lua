@@ -347,7 +347,7 @@ local function _render_tree(props)
           local priority_emoji = {
             immediate = "🔥",
             urgent    = "⚠️",
-            high      = "🟠",
+            high      = "🔴",
             normal    = "🟢",
             low       = "🔵",
             default   = "⚪"
