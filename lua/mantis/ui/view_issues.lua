@@ -57,31 +57,62 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
-  local tree     = n.tree({
+  local function get_help()
+    local keymap = props.options.keymap
+
+    local actions = {
+      { label = "Next",    key = "next_page" },
+      { label = "Prev",    key = "prev_page" },
+      { label = "Create",  key = "create_issue" },
+      { label = "Open",    key = "open_issue" },
+      { label = "Assign",  key = "assign_issue" },
+      { label = "Status",  key = "change_status" },
+      { label = "Refresh", key = "refresh" },
+      { label = "Quit",    key = "quit" },
+    }
+
+    local parts = {}
+
+    for _, item in ipairs(actions) do
+      local key = keymap[item.key]
+      if key then
+        table.insert(parts, string.format("%s: %s", item.label, key))
+      end
+    end
+
+    local out = " " .. table.concat(parts, "  |  ") .. " "
+
+    return {
+      n.line(out),
+    }
+  end
+
+  local tree = n.tree({
     flex = 1,
     autofocus = true,
     border_label = "MantisBT Issues",
     data = build_nodes(props.issues),
     on_change = function(node)
+      local keymap = props.options.keymap
       if node.type == 'issue' then
         local issue = node.issue
         signal.selected = issue.id
 
         -- open issue in browser
-        vim.keymap.set("n", props.options.keymap.open_issue, function()
+        vim.keymap.set("n", keymap.open_issue, function()
           local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
           vim.system({ 'xdg-open', url }, { detach = true })
         end, { desc = "Open issue in browser" })
 
         -- assign user
-        vim.keymap.set("n", props.options.keymap.assign_issue, function()
+        vim.keymap.set("n", keymap.assign_issue, function()
           props.on_assign_user(issue.id, issue.project.id, function()
             renderer:close()
           end, { desc = "Assign user" })
         end)
 
         -- change status
-        vim.keymap.set("n", props.options.keymap.change_status, function()
+        vim.keymap.set("n", keymap.change_status, function()
           props.on_change_status(issue.id, function()
             renderer:close()
           end)
@@ -89,6 +120,7 @@ local function _render_tree(props)
       end
     end,
     on_focus = function(state)
+      local keymap = props.options.keymap
       -- show help
       vim.keymap.set("n", "h", function()
         local show = signal.show_help:get_value()
@@ -96,25 +128,25 @@ local function _render_tree(props)
       end)
 
       -- refresh issues view
-      vim.keymap.set("n", props.options.keymap.refresh, function()
+      vim.keymap.set("n", keymap.refresh, function()
         props.on_refresh(function()
           renderer:close()
         end)
       end, { desc = "Refresh issues" })
 
       -- quit with 'q'
-      vim.keymap.set("n", props.options.keymap.quit, function()
+      vim.keymap.set("n", keymap.quit, function()
         renderer:close()
       end)
 
       -- create new issue
-      vim.keymap.set("n", props.options.keymap.create_issue, function()
+      vim.keymap.set("n", keymap.create_issue, function()
         props.on_create_issue()
         renderer:close()
       end, { desc = "Create new issue" })
 
       -- prev page
-      vim.keymap.set("n", props.options.keymap.prev_page, function()
+      vim.keymap.set("n", keymap.prev_page, function()
         if props.has_prev_page then
           props.on_prev_page(function()
             renderer:close()
@@ -123,14 +155,13 @@ local function _render_tree(props)
       end, { desc = "Prev page" })
 
       -- next page
-      vim.keymap.set("n", props.options.keymap.next_page, function()
+      vim.keymap.set("n", keymap.next_page, function()
         props.on_next_page(function()
           if props.has_next_page then
             renderer:close()
           end
         end)
       end, { desc = "Next page" })
-
     end,
     on_mount = function(component)
       component:set_border_text("bottom", "[h]elp", "left")
@@ -147,12 +178,13 @@ local function _render_tree(props)
 
       if type == 'project' then
         local project = node.project
-        line:append(n.text(string.format("└──  %s (%d)", project.name, node.count), "Function"))
+        line:append(n.text("──", "Comment"))
+        line:append(n.text(string.format("  %s (%d)", project.name, node.count), "Function"))
       elseif type == 'issue' then
         local issue = node.issue
         local column_width = props.options.ui.column_width
 
-        line:append(n.text("  └── ", "Function"))
+        line:append(n.text("  └── ", "Comment"))
 
         local status_bg = "MantisStatusBg_" .. issue.status.label
         vim.api.nvim_set_hl(0, status_bg, { bg = issue.status.color })
@@ -166,14 +198,14 @@ local function _render_tree(props)
 
         if column_width.id then
           local id = n.text(
-          string.format("%0" .. column_width.id .. "d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
+            string.format("%0" .. column_width.id .. "d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
           line:append(id)
         end
 
         if column_width.severity then
           local severity_text = "[" .. issue.severity.label .. "]"
           local severity = n.text(
-          string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
+            string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
             status_fg)
           line:append(severity)
         end
@@ -189,7 +221,8 @@ local function _render_tree(props)
 
         if column_width.category then
           local category = n.text(
-          string.format("%-" .. column_width.category .. "s ", util.truncate(issue.category.name, column_width.category)),
+            string.format("%-" .. column_width.category .. "s ",
+              util.truncate(issue.category.name, column_width.category)),
             "Identifier")
           line:append(category)
         end
@@ -203,20 +236,20 @@ local function _render_tree(props)
         if column_width.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
           local updated = n.text(
-          string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)), "Comment")
+            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)),
+            "Comment")
           line:append(updated)
         end
       end
 
       return line
-
     end,
   })
   renderer:render(n.rows(
     tree,
     n.paragraph({
       hidden = signal.show_help:negate(),
-      lines = "quit: q",
+      lines = get_help(),
       align = "center"
     })
   ))

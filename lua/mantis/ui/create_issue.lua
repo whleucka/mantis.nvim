@@ -86,7 +86,7 @@ local function _render_form(props)
     n.text_input({
       flex = 1,
       border_label = "Description",
-      max_lines = 5,
+      size = 3,
       validate = n.validator.compose(n.validator.min_length(1)),
       on_change = function(value, component)
         signal.description = value
