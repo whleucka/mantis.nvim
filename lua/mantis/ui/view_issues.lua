@@ -87,6 +87,14 @@ local function _render_tree(props)
     }
   end
 
+  local function update_issue(updated)
+    for i, issue in ipairs(props.issues) do
+      if issue.id == updated.id then
+        props.issues[i] = updated
+      end
+    end
+  end
+
   local tree = n.tree({
     flex = 1,
     autofocus = true,
@@ -106,15 +114,19 @@ local function _render_tree(props)
 
         -- assign user
         vim.keymap.set("n", keymap.assign_issue, function()
-          props.on_assign_user(issue.id, issue.project.id, function()
+          props.on_assign_user(issue.id, issue.project.id, function(issue)
+            update_issue(issue)
             renderer:close()
+            M.render(props)
           end, { desc = "Assign user" })
         end)
 
         -- change status
         vim.keymap.set("n", keymap.change_status, function()
-          props.on_change_status(issue.id, function()
+          props.on_change_status(issue.id, function(issue)
+            update_issue(issue)
             renderer:close()
+            M.render(props)
           end)
         end, { desc = "Change status" })
       end
@@ -122,15 +134,17 @@ local function _render_tree(props)
     on_focus = function(state)
       local keymap = props.options.keymap
       -- show help
-      vim.keymap.set("n", "h", function()
+      vim.keymap.set("n", keymap.help, function()
         local show = signal.show_help:get_value()
         signal.show_help = not show
       end)
 
       -- refresh issues view
       vim.keymap.set("n", keymap.refresh, function()
-        props.on_refresh(function()
+        props.on_refresh(function(issues)
+          props.issues = issues
           renderer:close()
+          M.render(props)
         end)
       end, { desc = "Refresh issues" })
 
@@ -148,33 +162,28 @@ local function _render_tree(props)
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()
         props.on_prev_page(function(issues)
-          if issues then
-            props.issues = issues
-            renderer:close()
-            M.render(props)
-          end
+          props.issues = issues
+          renderer:close()
+          M.render(props)
         end)
       end, { desc = "Prev page" })
 
       -- next page
       vim.keymap.set("n", keymap.next_page, function()
         props.on_next_page(function(issues)
-          if issues then
-            props.issues = issues
-            renderer:close()
-            M.render(props)
-          end
+          props.issues = issues
+          renderer:close()
+          M.render(props)
         end)
       end, { desc = "Next page" })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", "[h]elp", "left")
+      component:set_border_text("bottom", "["..props.options.keymap.help.."] help", "left")
     end,
     on_select = function(node, component)
       local type = node.type
       if type == 'project' then
         node.expanded = not node.expanded
-        util.debug(node.expanded)
       end
     end,
     prepare_node = function(node, line, component)

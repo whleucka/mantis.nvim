@@ -90,10 +90,9 @@ end
 function M.refresh(cb)
   local res = _mantis():get_issues(page_size, current_page)
   local issues = (res and res.issues) or {}
-  if issues and cb then
+  if next(issues) ~= nil and cb then
     vim.notify("MantisBT issues refreshed", vim.log.levels.INFO)
-    M.view_issues()
-    cb()
+    cb(issues)
   end
 end
 
@@ -131,15 +130,15 @@ function M.assign_user(issue_id, project_id, cb)
   vim.ui.select(options, { prompt = "Select a user" }, function(name)
     if not name then return end
     name = (name == 'n/a' and '') or name
-    _mantis():update_issue(issue_id, {
+    res = _mantis():update_issue(issue_id, {
       handler = {
         name = name
       }
     })
 
     if name and cb then
-      M.view_issues()
-      cb()
+      local issue = (res and res.issues) or {}
+      cb(issue[1])
     end
   end)
 end
@@ -156,15 +155,15 @@ function M.change_status(issue_id, cb)
   }
   vim.ui.select(options, { prompt = "Select a status" }, function(status)
     if not status then return end
-    _mantis():update_issue(issue_id, {
+    local res = _mantis():update_issue(issue_id, {
       status = {
         name = status
       }
     })
 
     if status and cb then
-      M.view_issues()
-      cb()
+      local issue = (res and res.issues) or {}
+      cb(issue[1])
     end
   end)
 end

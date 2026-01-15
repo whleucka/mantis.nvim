@@ -16,10 +16,10 @@ M.options = {
     }
   },
   view_issues = {
-    limit = 24,
+    limit = 50,
     ui = {
       width = 150,
-      height = 34,
+      height = 50,
       column_width = {
         s_color = 1,
         id = 7,
@@ -37,6 +37,7 @@ M.options = {
       open_issue = "gx",
       assign_issue = "ga",
       change_status = "gs",
+      help = "gh",
       refresh = "gr",
       quit = "q",
     }
