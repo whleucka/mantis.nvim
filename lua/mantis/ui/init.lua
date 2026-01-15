@@ -37,7 +37,7 @@ function M.create_issue()
     end,
   }, function(choice)
     if not choice then return end
-    local res = _mantis():get_project_users(choice.id)
+    res = _mantis():get_project_users(choice.id)
     local users = (res and res.users) or {}
 
     -- show create issue
@@ -137,8 +137,8 @@ function M.assign_user(issue_id, project_id, cb)
     })
 
     if name and cb then
-      local issue = (res and res.issues) or {}
-      cb(issue[1])
+      local issue = (res and res.issues[1]) or {}
+      cb(issue)
     end
   end)
 end
@@ -162,8 +162,8 @@ function M.change_status(issue_id, cb)
     })
 
     if status and cb then
-      local issue = (res and res.issues) or {}
-      cb(issue[1])
+      local issue = (res and res.issues[1]) or {}
+      cb(issue)
     end
   end)
 end

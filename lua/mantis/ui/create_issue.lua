@@ -48,6 +48,7 @@ local function _render_form(props)
             }
           }
           props.on_submit(new_issue)
+          renderer:close()
         end
       end,
     },
