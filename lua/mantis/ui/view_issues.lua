@@ -59,37 +59,129 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
-  local function get_help()
+  local function _get_help()
     local keymap = props.options.keymap
+    local COLUMN_GAP = 2
 
-    local actions = {
-      { label = "Next",     key = "next_page" },
-      { label = "Prev",     key = "prev_page" },
-      { label = "Create",   key = "create_issue" },
-      { label = "Open",     key = "open_issue" },
-      { label = "Assign",   key = "assign_issue" },
-      { label = "Status",   key = "change_status" },
-      { label = "Severity", key = "change_severity" },
-      { label = "Priority", key = "change_priority" },
-      { label = "Refresh",  key = "refresh" },
-      { label = "Quit",     key = "quit" },
+    -- help menu, grouped kinda like neogit
+    local groups = {
+      {
+        title = "Navigation",
+        items = {
+          { key = "next_page",  label = "Next page" },
+          { key = "prev_page",  label = "Prev page" },
+          { key = "open_issue", label = "Open issue" },
+        },
+      },
+      {
+        title = "Issues",
+        items = {
+          { key = "create_issue",    label = "Create issue" },
+          { key = "assign_issue",    label = "Assign issue" },
+          { key = "change_status",   label = "Change status" },
+          { key = "change_severity", label = "Change severity" },
+          { key = "change_priority", label = "Change priority" },
+        },
+      },
+      {
+        title = "Essential",
+        items = {
+          { key = "refresh", label = "Refresh" },
+          { key = "quit",    label = "Quit" },
+        },
+      },
     }
 
-    local parts = {}
-
-    for _, item in ipairs(actions) do
-      local key = keymap[item.key]
-      if key then
-        table.insert(parts, string.format("%s: %s", item.label, key))
+    -- resolve key mappings
+    for _, group in ipairs(groups) do
+      local resolved = {}
+      for _, item in ipairs(group.items) do
+        local key = keymap[item.key]
+        if key then
+          table.insert(resolved, {
+            key = key,
+            label = item.label,
+          })
+        end
       end
+      group.items = resolved
     end
 
-    local out = " " .. table.concat(parts, "  |  ") .. " "
+    -- per-column width calculation (no gap included)
+    for _, group in ipairs(groups) do
+      local key_w   = #group.title
+      local label_w = 0
 
-    return {
-      n.line(out),
-    }
+      for _, item in ipairs(group.items) do
+        key_w   = math.max(key_w, #item.key)
+        label_w = math.max(label_w, #item.label)
+      end
+
+      group.key_width   = key_w
+      group.label_width = label_w
+      group.col_width   = key_w + 1 + label_w
+    end
+
+    -- max rows
+    local max_rows = 0
+    for _, group in ipairs(groups) do
+      max_rows = math.max(max_rows, #group.items)
+    end
+
+    local lines = {}
+
+    local function join_columns(cols)
+      return table.concat(cols, string.rep(" ", COLUMN_GAP))
+    end
+
+    -- header
+    do
+      local header = {}
+      for _, group in ipairs(groups) do
+        table.insert(
+          header,
+          string.format("%-" .. group.col_width .. "s", group.title)
+        )
+      end
+      table.insert(lines, n.line(n.text(join_columns(header), "Special")))
+    end
+
+    -- separator
+    do
+      local sep = {}
+      for _, group in ipairs(groups) do
+        table.insert(sep, string.rep("-", group.col_width))
+      end
+      table.insert(lines, n.line(join_columns(sep)))
+    end
+
+    -- rows
+    for row = 1, max_rows do
+      local cols = {}
+
+      for _, group in ipairs(groups) do
+        local item = group.items[row]
+        if item then
+          table.insert(
+            cols,
+            string.format(
+              "%-" .. group.key_width .. "s %-"
+              .. group.label_width .. "s",
+              item.key,
+              item.label
+            )
+          )
+        else
+          table.insert(cols, string.rep(" ", group.col_width))
+        end
+      end
+
+      table.insert(lines, n.line(join_columns(cols)))
+    end
+
+    return lines
   end
+
 
   local function update_issue(updated)
     for i, issue in ipairs(props.issues) do
@@ -231,7 +323,8 @@ local function _render_tree(props)
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
         if column_width.s_color then
-          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", props.options.ui.status_symbol), status_fg)
+          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", props.options.ui.status_symbol),
+            status_fg)
           line:append(s_colour)
         end
 
@@ -276,7 +369,9 @@ local function _render_tree(props)
 
         if column_width.severity then
           local severity_text = "[" .. issue.severity.label .. "]"
-          local severity = n.text(string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)), "Identifier")
+          local severity = n.text(
+            string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
+            "Identifier")
           line:append(severity)
         end
 
@@ -289,7 +384,8 @@ local function _render_tree(props)
         if column_width.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
           local updated = n.text(
-            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)), "Comment")
+            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)),
+            "Comment")
           line:append(updated)
         end
       end
@@ -301,7 +397,7 @@ local function _render_tree(props)
     tree,
     n.paragraph({
       hidden = signal.show_help:negate(),
-      lines = get_help(),
+      lines = _get_help(),
       align = "center"
     })
   ))
