@@ -62,6 +62,7 @@ function M.view_issues()
   -- show view issues
   ViewIssues.render({
     page = current_page,
+    current_host = current_host,
     host = config.options.hosts[current_host],
     options = config.options.view_issues,
     issues = issues,

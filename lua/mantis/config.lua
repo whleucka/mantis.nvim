@@ -16,20 +16,18 @@ M.options = {
     }
   },
   view_issues = {
-    limit = 50,
+    limit = 42,
     ui = {
       width = 150,
       height = 50,
-      status_symbol = "◆",
-      column_width = {
-        s_color = 1,
+      columns = {
+        priority = 1,
         id = 7,
         severity = 10,
-        priority = 1,
         status = 24,
         category = 12,
         summary = 69,
-        updated = 9
+        updated = 10
       }
     },
     keymap = {

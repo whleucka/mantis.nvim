@@ -194,7 +194,7 @@ local function _render_tree(props)
   local tree = n.tree({
     flex = 1,
     autofocus = true,
-    border_label = "MantisBT Issues",
+    border_label = "MantisBT Issues [" .. props.current_host .. "]",
     data = build_nodes(props.issues),
     on_change = function(node)
       local keymap = props.options.keymap
@@ -306,10 +306,10 @@ local function _render_tree(props)
       if type == 'project' then
         local project = node.project
         line:append(n.text("──", "Comment"))
-        line:append(n.text(string.format(" %s (%d)", project.name, node.count), "Function"))
+        line:append(n.text(string.format(" %s (%d)", project.name, node.count), "Directory"))
       elseif type == 'issue' then
         local issue = node.issue
-        local column_width = props.options.ui.column_width
+        local columns = props.options.ui.columns
 
         if node.index == node.count then
           line:append(n.text("  └── ", "Comment"))
@@ -322,28 +322,7 @@ local function _render_tree(props)
         local status_fg = "MantisStatusFg_" .. issue.status.label
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
-        if column_width.s_color then
-          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", props.options.ui.status_symbol),
-            status_fg)
-          line:append(s_colour)
-        end
-
-        if column_width.id then
-          local id = n.text(
-            string.format("%0" .. column_width.id .. "d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
-          line:append(id)
-        end
-
-        if column_width.status then
-          local handler = issue.handler and issue.handler.name or 'n/a'
-          local status_text = issue.status.label .. ' (' .. handler .. ')'
-          local status = n.text(
-            string.format("%-" .. column_width.status .. "s ", util.truncate(status_text, column_width.status)),
-            status_fg)
-          line:append(status)
-        end
-
-        if column_width.priority then
+        if columns.priority then
           local priority_emoji = {
             immediate = "🔥",
             urgent    = "⚠️",
@@ -355,37 +334,46 @@ local function _render_tree(props)
           local label = issue.priority.label
           local key = label:lower()
           local emoji = priority_emoji[key] or priority_emoji['default']
+          if issue.status.label == 'resolved' or issue.status.label == 'closed' then
+            emoji = "✅"
+          end
 
-          line:append(n.text(string.format("%-" .. column_width.priority .. "s ", emoji)))
+          line:append(n.text(string.format("%-" .. columns.priority .. "s ", emoji)))
         end
 
-        if column_width.category then
-          local category = n.text(
-            string.format("%-" .. column_width.category .. "s ",
-              util.truncate(issue.category.name, column_width.category)), "Type")
+        if columns.id then
+          local id = n.text(string.format("%0" .. columns.id .. "d ", util.truncate(tostring(issue.id), columns.id)), status_fg)
+          line:append(id)
+        end
+
+        if columns.status then
+          local handler = issue.handler and issue.handler.name or 'n/a'
+          local status_text = issue.status.label .. ' (' .. handler .. ')'
+          local status = n.text(string.format("%-" .. columns.status .. "s ", util.truncate(status_text, columns.status)), status_fg)
+          line:append(status)
+        end
+
+
+        if columns.category then
+          local category = n.text(string.format("%-" .. columns.category .. "s ", util.truncate(issue.category.name, columns.category)), "Type")
           line:append(category)
         end
 
 
-        if column_width.severity then
+        if columns.severity then
           local severity_text = "[" .. issue.severity.label .. "]"
-          local severity = n.text(
-            string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
-            "Identifier")
+          local severity = n.text(string.format("%-" .. columns.severity .. "s ", util.truncate(severity_text, columns.severity)), "Identifier")
           line:append(severity)
         end
 
-        if column_width.summary then
-          local summary = n.text(string.format("%-" .. column_width.summary .. "s ",
-            util.truncate(issue.summary, column_width.summary)))
+        if columns.summary then
+          local summary = n.text(string.format("%-" .. columns.summary .. "s ", util.truncate(issue.summary, columns.summary)))
           line:append(summary)
         end
 
-        if column_width.updated then
+        if columns.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
-          local updated = n.text(
-            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)),
-            "Comment")
+          local updated = n.text(string.format("%" .. columns.updated .. "s", util.truncate(updated_text, columns.updated)), "Comment")
           line:append(updated)
         end
       end
