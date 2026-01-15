@@ -71,6 +71,9 @@ function M.view_issues()
     on_change_severity = function(issue_id, cb)
       M.change_severity(issue_id, cb)
     end,
+    on_change_priority = function(issue_id, cb)
+      M.change_priority(issue_id, cb)
+    end,
     on_change_status = function(issue_id, cb)
       M.change_status(issue_id, cb)
     end,
@@ -171,6 +174,7 @@ function M.change_status(issue_id, cb)
   end)
 end
 
+-- change the severity of a MantisBT issue
 function M.change_severity(issue_id, cb)
   local options = {
     "feature",
@@ -191,6 +195,31 @@ function M.change_severity(issue_id, cb)
     })
 
     if severity and cb then
+      local issue = (res and res.issues[1]) or {}
+      cb(issue)
+    end
+  end)
+end
+
+-- change the priority of a MantisBT issue
+function M.change_priority(issue_id, cb)
+  local options = {
+    "none",
+    "low",
+    "normal",
+    "high",
+    "urgent",
+    "immediate",
+  }
+  vim.ui.select(options, { prompt = "Select a priority" }, function(priority)
+    if not priority then return end
+    local res = _mantis():update_issue(issue_id, {
+      priority = {
+        name = priority
+      }
+    })
+
+    if priority and cb then
       local issue = (res and res.issues[1]) or {}
       cb(issue)
     end
