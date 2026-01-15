@@ -69,6 +69,7 @@ local function _render_tree(props)
       { label = "Open",    key = "open_issue" },
       { label = "Assign",  key = "assign_issue" },
       { label = "Status",  key = "change_status" },
+      { label = "Severity",  key = "change_severity" },
       { label = "Refresh", key = "refresh" },
       { label = "Quit",    key = "quit" },
     }
@@ -123,10 +124,19 @@ local function _render_tree(props)
           end, { desc = "Assign user" })
         end)
 
+        -- change severity
+        vim.keymap.set("n", keymap.change_severity, function()
+          props.on_change_severity(issue.id, function(new_issue)
+            update_issue(new_issue)
+            renderer:close()
+            M.render(props)
+          end)
+        end, { desc = "Change severity" })
+
         -- change status
         vim.keymap.set("n", keymap.change_status, function()
-          props.on_change_status(issue.id, function(issue)
-            update_issue(issue)
+          props.on_change_status(issue.id, function(new_issue)
+            update_issue(new_issue)
             renderer:close()
             M.render(props)
           end)

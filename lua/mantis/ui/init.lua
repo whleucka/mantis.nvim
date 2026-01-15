@@ -68,6 +68,9 @@ function M.view_issues()
     on_create_issue = function()
       M.create_issue()
     end,
+    on_change_severity = function(issue_id, cb)
+      M.change_severity(issue_id, cb)
+    end,
     on_change_status = function(issue_id, cb)
       M.change_status(issue_id, cb)
     end,
@@ -162,6 +165,32 @@ function M.change_status(issue_id, cb)
     })
 
     if status and cb then
+      local issue = (res and res.issues[1]) or {}
+      cb(issue)
+    end
+  end)
+end
+
+function M.change_severity(issue_id, cb)
+  local options = {
+    "feature",
+    "trivial",
+    "text",
+    "tweak",
+    "minor",
+    "major",
+    "crash",
+    "block",
+  }
+  vim.ui.select(options, { prompt = "Select a severity" }, function(severity)
+    if not severity then return end
+    local res = _mantis():update_issue(issue_id, {
+      severity = {
+        name = severity
+      }
+    })
+
+    if severity and cb then
       local issue = (res and res.issues[1]) or {}
       cb(issue)
     end

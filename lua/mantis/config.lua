@@ -37,6 +37,7 @@ M.options = {
       open_issue = "gx",
       assign_issue = "ga",
       change_status = "gs",
+      change_severity = "gv",
       help = "gh",
       refresh = "gr",
       quit = "q",
