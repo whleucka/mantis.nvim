@@ -147,18 +147,22 @@ local function _render_tree(props)
 
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()
-        if props.has_prev_page then
-          props.on_prev_page(function()
+        props.on_prev_page(function(issues)
+          if issues then
+            props.issues = issues
             renderer:close()
-          end)
-        end
+            M.render(props)
+          end
+        end)
       end, { desc = "Prev page" })
 
       -- next page
       vim.keymap.set("n", keymap.next_page, function()
-        props.on_next_page(function()
-          if props.has_next_page then
+        props.on_next_page(function(issues)
+          if issues then
+            props.issues = issues
             renderer:close()
+            M.render(props)
           end
         end)
       end, { desc = "Next page" })

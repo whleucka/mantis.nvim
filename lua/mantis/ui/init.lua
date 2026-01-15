@@ -57,11 +57,7 @@ end
 function M.view_issues()
   local ViewIssues = require("mantis.ui.view_issues")
   local res = _mantis():get_issues(page_size, current_page)
-  local next_page = _mantis():get_issues(page_size, current_page + 1)
   local issues = (res and res.issues) or {}
-  local _issues = (next_page and next_page.issues) or {}
-  local has_prev_page = (issues and current_page ~= 1 and true) or false
-  local has_next_page = (issues and #_issues > 0 and true) or false
 
   -- show view issues
   ViewIssues.render({
@@ -79,20 +75,14 @@ function M.view_issues()
       M.assign_user(issue_id, project_id, cb)
     end,
     on_prev_page = function(cb)
-      if has_prev_page then
-        M.prev_page(cb)
-      end
+      M.prev_page(cb)
     end,
     on_next_page = function(cb)
-      if has_next_page then
-        M.next_page(cb)
-      end
+      M.next_page(cb)
     end,
     on_refresh = function(cb)
       M.refresh(cb)
     end,
-    has_prev_page = has_prev_page,
-    has_next_page = has_next_page,
   })
 end
 
@@ -110,12 +100,12 @@ end
 -- previous page of issues
 function M.prev_page(cb)
   local prev_page = current_page - 1
+  if prev_page < 1 then return end
   local res = _mantis():get_issues(page_size, prev_page)
   local issues = (res and res.issues) or {}
-  if issues and cb then
+  if next(issues) ~= nil and cb then
     current_page = prev_page
-    M.view_issues()
-    cb()
+    cb(issues)
   end
 end
 
@@ -124,10 +114,9 @@ function M.next_page(cb)
   local next_page = current_page + 1
   local res = _mantis():get_issues(page_size, next_page)
   local issues = (res and res.issues) or {}
-  if issues and cb then
+  if next(issues) ~= nil and cb then
     current_page = next_page
-    M.view_issues()
-    cb()
+    cb(issues)
   end
 end
 
