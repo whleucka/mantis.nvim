@@ -32,8 +32,10 @@ local function build_nodes(issues)
     }
     table.insert(nodes, n.node(_payload))
     table.insert(flat_issues, _payload)
-    for _, issue in ipairs(entry.issues) do
+    for i, issue in ipairs(entry.issues) do
       local _issue = {
+        index = i,
+        count = #entry.issues,
         type = 'issue',
         project_id = entry.project.id,
         issue = issue,
@@ -197,7 +199,11 @@ local function _render_tree(props)
         local issue = node.issue
         local column_width = props.options.ui.column_width
 
-        line:append(n.text("  └── ", "Comment"))
+        if node.index == node.count then
+          line:append(n.text("  └── ", "Comment"))
+        else
+          line:append(n.text("  ├── ", "Comment"))
+        end
 
         local status_bg = "MantisStatusBg_" .. issue.status.label
         vim.api.nvim_set_hl(0, status_bg, { bg = issue.status.color })
