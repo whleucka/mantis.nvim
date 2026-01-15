@@ -63,16 +63,16 @@ local function _render_tree(props)
     local keymap = props.options.keymap
 
     local actions = {
-      { label = "Next",    key = "next_page" },
-      { label = "Prev",    key = "prev_page" },
-      { label = "Create",  key = "create_issue" },
-      { label = "Open",    key = "open_issue" },
-      { label = "Assign",  key = "assign_issue" },
-      { label = "Status",  key = "change_status" },
-      { label = "Severity",  key = "change_severity" },
-      { label = "Priority",  key = "change_priority" },
-      { label = "Refresh", key = "refresh" },
-      { label = "Quit",    key = "quit" },
+      { label = "Next",     key = "next_page" },
+      { label = "Prev",     key = "prev_page" },
+      { label = "Create",   key = "create_issue" },
+      { label = "Open",     key = "open_issue" },
+      { label = "Assign",   key = "assign_issue" },
+      { label = "Status",   key = "change_status" },
+      { label = "Severity", key = "change_severity" },
+      { label = "Priority", key = "change_priority" },
+      { label = "Refresh",  key = "refresh" },
+      { label = "Quit",     key = "quit" },
     }
 
     local parts = {}
@@ -200,7 +200,7 @@ local function _render_tree(props)
       end, { desc = "Next page" })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", "["..props.options.keymap.help.."] help", "left")
+      component:set_border_text("bottom", "[" .. props.options.keymap.help .. "] help", "left")
     end,
     on_select = function(node, component)
       local type = node.type
@@ -231,7 +231,7 @@ local function _render_tree(props)
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
         if column_width.s_color then
-          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", "●"), status_fg)
+          local s_colour = n.text(string.format("%" .. column_width.s_color .. "s ", props.options.ui.status_symbol), status_fg)
           line:append(s_colour)
         end
 
@@ -239,14 +239,6 @@ local function _render_tree(props)
           local id = n.text(
             string.format("%0" .. column_width.id .. "d ", util.truncate(tostring(issue.id), column_width.id)), status_fg)
           line:append(id)
-        end
-
-        if column_width.severity then
-          local severity_text = "[" .. issue.severity.label .. "]"
-          local severity = n.text(
-            string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)),
-            status_fg)
-          line:append(severity)
         end
 
         if column_width.status then
@@ -258,12 +250,34 @@ local function _render_tree(props)
           line:append(status)
         end
 
+        if column_width.priority then
+          local priority_emoji = {
+            immediate = "🔥",
+            urgent    = "⚠️",
+            high      = "🟠",
+            normal    = "🟢",
+            low       = "🔵",
+            default   = "⚪"
+          }
+          local label = issue.priority.label
+          local key = label:lower()
+          local emoji = priority_emoji[key] or priority_emoji['default']
+
+          line:append(n.text(string.format("%-" .. column_width.priority .. "s ", emoji)))
+        end
+
         if column_width.category then
           local category = n.text(
             string.format("%-" .. column_width.category .. "s ",
-              util.truncate(issue.category.name, column_width.category)),
-            "Identifier")
+              util.truncate(issue.category.name, column_width.category)), "Type")
           line:append(category)
+        end
+
+
+        if column_width.severity then
+          local severity_text = "[" .. issue.severity.label .. "]"
+          local severity = n.text(string.format("%-" .. column_width.severity .. "s ", util.truncate(severity_text, column_width.severity)), "Identifier")
+          line:append(severity)
         end
 
         if column_width.summary then
@@ -275,8 +289,7 @@ local function _render_tree(props)
         if column_width.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
           local updated = n.text(
-            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)),
-            "Comment")
+            string.format("%" .. column_width.updated .. "s", util.truncate(updated_text, column_width.updated)), "Comment")
           line:append(updated)
         end
       end

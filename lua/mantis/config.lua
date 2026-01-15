@@ -20,14 +20,16 @@ M.options = {
     ui = {
       width = 150,
       height = 50,
+      status_symbol = "◆",
       column_width = {
         s_color = 1,
         id = 7,
-        severity = 9,
+        severity = 10,
+        priority = 1,
         status = 24,
         category = 12,
-        summary = 70,
-        updated = 10
+        summary = 69,
+        updated = 9
       }
     },
     keymap = {
