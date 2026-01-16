@@ -4,7 +4,7 @@ local util = require("mantis.util")
 
 local function _render_form(props)
   local signal   = n.create_signal({
-    note = nil,
+    text = nil,
   })
 
   local renderer = n.create_renderer({
@@ -14,6 +14,7 @@ local function _render_form(props)
 
   renderer:render(n.form({
       id = "add-note",
+      autofocus = true,
       submit_key = "<C-CR>",
       on_submit = function(is_valid)
         if is_valid then
@@ -24,7 +25,7 @@ local function _render_form(props)
               name = "public"
             }
           }
-          props.on_submit(note)
+          props.on_submit(note, props.issue_id)
           renderer:close()
         end
       end,
@@ -35,6 +36,9 @@ local function _render_form(props)
         flex = 1,
         border_label = "Note",
         size = 3,
+        on_change = function(value, component)
+          signal.text = value
+        end,
         validate = n.validator.compose(n.validator.min_length(1)),
       })
     )

@@ -9,6 +9,12 @@ M.options = {
       height = 10,
     }
   },
+  add_note = {
+    ui = {
+      width = 80,
+      height = 15,
+    }
+  },
   create_issue = {
     ui = {
       width = 80,

@@ -19,8 +19,16 @@ local function _mantis()
   return api.new(current_host)
 end
 
-function M.add_note(issue_id, cb)
-  print("WIP")
+function M.add_note(issue_id)
+  local AddNote = require("mantis.ui.add_note")
+  AddNote.render({
+    issue_id = issue_id,
+    options = config.options.add_note,
+    on_submit = function(note)
+      _mantis():create_issue_note(issue_id, note)
+      M.view_issues()
+    end
+  })
 end
 
 -- create a new issue
@@ -70,8 +78,8 @@ function M.view_issues()
     host = config.options.hosts[current_host],
     options = config.options.view_issues,
     issues = issues,
-    on_add_note = function(issue_id, cb)
-      M.add_note(issue_id, cb)
+    on_add_note = function(issue_id)
+      M.add_note(issue_id)
     end,
     on_create_issue = function()
       M.create_issue()

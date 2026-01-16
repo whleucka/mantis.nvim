@@ -200,7 +200,7 @@ local function _render_tree(props)
   local tree = n.tree({
     flex = 1,
     autofocus = true,
-    border_label = "MantisBT Issues [" .. props.current_host .. "]",
+    border_label = " MantisBT Issues [" .. props.current_host .. "] ",
     data = _build_nodes(props.issues),
     on_change = function(node)
       if node.type == 'issue' then
@@ -235,7 +235,8 @@ local function _render_tree(props)
 
       -- add note
       vim.keymap.set("n", keymap.add_note, function()
-        props.on_add_note()
+        local issue = signal.selected:get_value()
+        props.on_add_note(issue.id)
         renderer:close()
       end, { desc = "Add note" })
 
@@ -311,7 +312,7 @@ local function _render_tree(props)
       end, { desc = "Change status" })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", "[" .. props.options.keymap.help .. "] help", "left")
+      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help ", "left")
     end,
     on_select = function(node, component)
       -- TODO this works, but it causes errors because scrollable height has changed
