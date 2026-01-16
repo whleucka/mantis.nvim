@@ -33,6 +33,7 @@ M.options = {
     keymap = {
       next_page = "<C-n>",
       prev_page = "<C-p>",
+      add_note = "gn",
       create_issue = "gc",
       open_issue = "gx",
       assign_issue = "ga",

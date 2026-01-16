@@ -2,7 +2,7 @@ local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
 
-local function build_nodes(issues)
+local function _build_nodes(issues)
   local projects = {}
 
   for _, issue in ipairs(issues) do
@@ -26,15 +26,14 @@ local function build_nodes(issues)
       type = 'project',
       project = entry.project,
       count = #entry.issues,
-      expanded = true,
     }
     table.insert(nodes, n.node(_payload))
     for i, issue in ipairs(entry.issues) do
+      if issue.expanded == nil then issue.expanded = true end
       local _issue = {
         index = i,
         count = #entry.issues,
         type = 'issue',
-        project_id = entry.project.id,
         issue = issue,
       }
       table.insert(nodes, n.node(_issue))
@@ -55,6 +54,16 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
+  local function _toggle_expand(project_id)
+    for i, issue in ipairs(props.issues) do
+      if issue.project.id == project_id then
+        local expanded = props.issues[i].expanded
+        props.issues[i].expanded = not expanded
+      end
+    end
+  end
+
+
   local function _get_help()
     local keymap = props.options.keymap
     local COLUMN_GAP = 2
@@ -72,6 +81,7 @@ local function _render_tree(props)
       {
         title = "Issues",
         items = {
+          { key = "add_note",        label = "Add note" },
           { key = "create_issue",    label = "Create issue" },
           { key = "assign_issue",    label = "Assign issue" },
           { key = "change_status",   label = "Change status" },
@@ -179,7 +189,7 @@ local function _render_tree(props)
   end
 
 
-  local function update_issue(updated)
+  local function _update_issue(updated)
     for i, issue in ipairs(props.issues) do
       if issue.id == updated.id then
         props.issues[i] = updated
@@ -191,54 +201,14 @@ local function _render_tree(props)
     flex = 1,
     autofocus = true,
     border_label = "MantisBT Issues [" .. props.current_host .. "]",
-    data = build_nodes(props.issues),
+    data = _build_nodes(props.issues),
     on_change = function(node)
-      local keymap = props.options.keymap
       if node.type == 'issue' then
         local issue = node.issue
-        signal.selected = issue.id
-
-        -- open issue in browser
-        vim.keymap.set("n", keymap.open_issue, function()
-          local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
-          vim.system({ 'xdg-open', url }, { detach = true })
-        end, { desc = "Open issue in browser" })
-
-        -- assign user
-        vim.keymap.set("n", keymap.assign_issue, function()
-          props.on_assign_user(issue.id, issue.project.id, function(issue)
-            update_issue(issue)
-            renderer:close()
-            M.render(props)
-          end, { desc = "Assign user" })
-        end)
-
-        -- change severity
-        vim.keymap.set("n", keymap.change_severity, function()
-          props.on_change_severity(issue.id, function(new_issue)
-            update_issue(new_issue)
-            renderer:close()
-            M.render(props)
-          end)
-        end, { desc = "Change severity" })
-
-        -- change priority
-        vim.keymap.set("n", keymap.change_priority, function()
-          props.on_change_priority(issue.id, function(new_issue)
-            update_issue(new_issue)
-            renderer:close()
-            M.render(props)
-          end)
-        end, { desc = "Change priority" })
-
-        -- change status
-        vim.keymap.set("n", keymap.change_status, function()
-          props.on_change_status(issue.id, function(new_issue)
-            update_issue(new_issue)
-            renderer:close()
-            M.render(props)
-          end)
-        end, { desc = "Change status" })
+        signal.selected = issue
+      elseif node.type == 'project' then
+        local project = node.project
+        signal.selected = project
       end
     end,
     on_focus = function(state)
@@ -286,15 +256,64 @@ local function _render_tree(props)
           M.render(props)
         end)
       end, { desc = "Next page" })
+
+      -- open issue in browser
+      vim.keymap.set("n", keymap.open_issue, function()
+        local issue = signal.selected:get_value()
+        local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
+        vim.system({ 'xdg-open', url }, { detach = true })
+      end, { desc = "Open issue in browser" })
+
+      -- assign user
+      vim.keymap.set("n", keymap.assign_issue, function()
+        local issue = signal.selected:get_value()
+        props.on_assign_user(issue.id, issue.project.id, function(issue)
+          _update_issue(issue)
+          renderer:close()
+          M.render(props)
+        end, { desc = "Assign user" })
+      end)
+
+      -- change severity
+      vim.keymap.set("n", keymap.change_severity, function()
+        local issue = signal.selected:get_value()
+        props.on_change_severity(issue.id, function(new_issue)
+          _update_issue(new_issue)
+          renderer:close()
+          M.render(props)
+        end)
+      end, { desc = "Change severity" })
+
+      -- change priority
+      vim.keymap.set("n", keymap.change_priority, function()
+        local issue = signal.selected:get_value()
+        props.on_change_priority(issue.id, function(new_issue)
+          _update_issue(new_issue)
+          renderer:close()
+          M.render(props)
+        end)
+      end, { desc = "Change priority" })
+
+      -- change status
+      vim.keymap.set("n", keymap.change_status, function()
+        local issue = signal.selected:get_value()
+        props.on_change_status(issue.id, function(new_issue)
+          _update_issue(new_issue)
+          renderer:close()
+          M.render(props)
+        end)
+      end, { desc = "Change status" })
     end,
     on_mount = function(component)
       component:set_border_text("bottom", "[" .. props.options.keymap.help .. "] help", "left")
     end,
     on_select = function(node, component)
-      local type = node.type
-      if type == 'project' then
-        node.expanded = not node.expanded
-      end
+      -- TODO this works, but it causes errors because scrollable height has changed
+      -- if node.type == 'project' then
+      --   _toggle_expand(node.project.id)
+      --   renderer:close()
+      --   M.render(props)
+      -- end
     end,
     prepare_node = function(node, line, component)
       local type = node.type
@@ -305,6 +324,7 @@ local function _render_tree(props)
         line:append(n.text(string.format(" %s (%d)", project.name, node.count), "Directory"))
       elseif type == 'issue' then
         local issue = node.issue
+        if not issue.expanded then return end
         local columns = props.options.ui.columns
 
         if node.index == node.count then
@@ -338,38 +358,44 @@ local function _render_tree(props)
         end
 
         if columns.id then
-          local id = n.text(string.format("%0" .. columns.id .. "d ", util.truncate(tostring(issue.id), columns.id)), status_fg)
+          local id = n.text(string.format("%0" .. columns.id .. "d ", util.truncate(tostring(issue.id), columns.id)),
+            status_fg)
           line:append(id)
         end
 
         if columns.status then
           local handler = issue.handler and issue.handler.name or 'n/a'
           local status_text = issue.status.label .. ' (' .. handler .. ')'
-          local status = n.text(string.format("%-" .. columns.status .. "s ", util.truncate(status_text, columns.status)), status_fg)
+          local status = n.text(
+            string.format("%-" .. columns.status .. "s ", util.truncate(status_text, columns.status)), status_fg)
           line:append(status)
         end
 
 
         if columns.category then
-          local category = n.text(string.format("%-" .. columns.category .. "s ", util.truncate(issue.category.name, columns.category)), "Type")
+          local category = n.text(
+            string.format("%-" .. columns.category .. "s ", util.truncate(issue.category.name, columns.category)), "Type")
           line:append(category)
         end
 
 
         if columns.severity then
           local severity_text = "[" .. issue.severity.label .. "]"
-          local severity = n.text(string.format("%-" .. columns.severity .. "s ", util.truncate(severity_text, columns.severity)), "Identifier")
+          local severity = n.text(
+            string.format("%-" .. columns.severity .. "s ", util.truncate(severity_text, columns.severity)), "Identifier")
           line:append(severity)
         end
 
         if columns.summary then
-          local summary = n.text(string.format("%-" .. columns.summary .. "s ", util.truncate(issue.summary, columns.summary)))
+          local summary = n.text(string.format("%-" .. columns.summary .. "s ",
+            util.truncate(issue.summary, columns.summary)))
           line:append(summary)
         end
 
         if columns.updated then
           local updated_text = util.time_ago(util.parse_iso8601(issue.updated_at))
-          local updated = n.text(string.format("%" .. columns.updated .. "s", util.truncate(updated_text, columns.updated)), "Comment")
+          local updated = n.text(
+            string.format("%" .. columns.updated .. "s", util.truncate(updated_text, columns.updated)), "Comment")
           line:append(updated)
         end
       end
@@ -377,13 +403,15 @@ local function _render_tree(props)
       return line
     end,
   })
+
+  local help = n.paragraph({
+    hidden = signal.show_help:negate(),
+    lines = _get_help(),
+    align = "center"
+  })
   renderer:render(n.rows(
     tree,
-    n.paragraph({
-      hidden = signal.show_help:negate(),
-      lines = _get_help(),
-      align = "center"
-    })
+    help
   ))
 end
 

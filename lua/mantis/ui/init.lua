@@ -66,6 +66,9 @@ function M.view_issues()
     host = config.options.hosts[current_host],
     options = config.options.view_issues,
     issues = issues,
+    on_add_note = function(issue_id, cb)
+      M.add_note(issue_id, cb)
+    end,
     on_create_issue = function()
       M.create_issue()
     end,
