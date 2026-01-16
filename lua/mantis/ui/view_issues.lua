@@ -2,8 +2,6 @@ local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
 
-local flat_issues = {}
-
 local function build_nodes(issues)
   local projects = {}
 
@@ -31,7 +29,6 @@ local function build_nodes(issues)
       expanded = true,
     }
     table.insert(nodes, n.node(_payload))
-    table.insert(flat_issues, _payload)
     for i, issue in ipairs(entry.issues) do
       local _issue = {
         index = i,
@@ -41,7 +38,6 @@ local function build_nodes(issues)
         issue = issue,
       }
       table.insert(nodes, n.node(_issue))
-      table.insert(flat_issues, _issue)
     end
   end
 
