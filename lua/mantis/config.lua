@@ -15,7 +15,7 @@ M.options = {
       height = 15,
     },
     keymap = {
-      toggle_time = "<leader>et",
+      toggle_time = "<C-t>",
     }
   },
   create_issue = {

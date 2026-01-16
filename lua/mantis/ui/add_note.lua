@@ -79,7 +79,7 @@ local function _render_form(props)
           vim.keymap.set("n", keymap.toggle_time, function()
             local show_time = signal.show_time:get_value()
             signal.show_time = not show_time
-          end, { desc = "Toggle Time Tracking" })
+          end, { desc = "Toggle Time Tracking", buffer = true })
         end,
       }),
       n.text_input({
