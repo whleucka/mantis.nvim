@@ -28,9 +28,6 @@ local function _render_form(props)
   renderer:render(n.form({
       id = "create-issue",
       submit_key = "<C-CR>",
-      on_mount = function(component)
-        component:set_border_text("bottom", "[h]elp", "left")
-      end,
       on_submit = function(is_valid)
         if is_valid then
           local s = signal:get_value()

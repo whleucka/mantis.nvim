@@ -19,6 +19,10 @@ local function _mantis()
   return api.new(current_host)
 end
 
+function M.add_note(issue_id, cb)
+  print("WIP")
+end
+
 -- create a new issue
 function M.create_issue()
   local CreateIssue = require("mantis.ui.create_issue")

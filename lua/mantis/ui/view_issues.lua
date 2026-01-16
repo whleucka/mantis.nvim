@@ -233,6 +233,12 @@ local function _render_tree(props)
         renderer:close()
       end)
 
+      -- add note
+      vim.keymap.set("n", keymap.add_note, function()
+        props.on_add_note()
+        renderer:close()
+      end, { desc = "Add note" })
+
       -- create new issue
       vim.keymap.set("n", keymap.create_issue, function()
         props.on_create_issue()
