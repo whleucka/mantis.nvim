@@ -17,7 +17,8 @@ function M.new(host_name)
   }
 
   if not instance.url or not instance.token then
-    vim.notify('Mantis: URL or token not configured for host "' .. (host_name or 'default') .. '".', vim.log.levels.ERROR)
+    vim.notify('Mantis: URL or token not configured for host "' .. (host_name or 'default') .. '".', vim.log.levels
+    .ERROR)
     return nil
   end
 
@@ -78,12 +79,13 @@ local function call_api(endpoint, method, data)
   if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
     local error_message = "Mantis API Error"
     if response.body and response.body ~= "" then
-        local decoded_body, _ = pcall(vim.fn.json_decode, response.body)
-        if decoded_body and decoded_body.message then
-          error_message = decoded_body.message
-        else
-          error_message = response.body
-        end
+      local ok, decoded = pcall(vim.fn.json_decode, response.body)
+
+      if ok and type(decoded) == "table" and decoded.message then
+        error_message = decoded.message
+      else
+        error_message = response.body
+      end
     end
     if config.options.debug then
       vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)

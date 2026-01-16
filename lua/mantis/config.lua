@@ -13,6 +13,9 @@ M.options = {
     ui = {
       width = 80,
       height = 15,
+    },
+    keymap = {
+      toggle_time = "<leader>et",
     }
   },
   create_issue = {
