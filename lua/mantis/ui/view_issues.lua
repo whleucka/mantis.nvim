@@ -217,7 +217,7 @@ local function _render_tree(props)
       vim.keymap.set("n", keymap.help, function()
         local show = signal.show_help:get_value()
         signal.show_help = not show
-      end)
+      end, { buffer = true })
 
       -- refresh issues view
       vim.keymap.set("n", keymap.refresh, function()
@@ -226,25 +226,25 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Refresh issues" })
+      end, { desc = "Refresh issues", buffer = true })
 
       -- quit with 'q'
       vim.keymap.set("n", keymap.quit, function()
         renderer:close()
-      end)
+      end, { buffer = true })
 
       -- add note
       vim.keymap.set("n", keymap.add_note, function()
         local issue = signal.selected:get_value()
         props.on_add_note(issue.id)
         renderer:close()
-      end, { desc = "Add note" })
+      end, { desc = "Add note", buffer = true })
 
       -- create new issue
       vim.keymap.set("n", keymap.create_issue, function()
         props.on_create_issue()
         renderer:close()
-      end, { desc = "Create new issue" })
+      end, { desc = "Create new issue", buffer = true })
 
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()
@@ -253,7 +253,7 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Prev page" })
+      end, { desc = "Prev page", buffer = true })
 
       -- next page
       vim.keymap.set("n", keymap.next_page, function()
@@ -262,14 +262,14 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Next page" })
+      end, { desc = "Next page", buffer = true })
 
       -- open issue in browser
       vim.keymap.set("n", keymap.open_issue, function()
         local issue = signal.selected:get_value()
         local url = string.format("%s/view.php?id=%d", props.host.url, issue.id)
         vim.system({ 'xdg-open', url }, { detach = true })
-      end, { desc = "Open issue in browser" })
+      end, { desc = "Open issue in browser", buffer = true })
 
       -- assign user
       vim.keymap.set("n", keymap.assign_issue, function()
@@ -278,8 +278,8 @@ local function _render_tree(props)
           _update_issue(issue)
           renderer:close()
           M.render(props)
-        end, { desc = "Assign user" })
-      end)
+        end)
+      end, { desc = "Assign user", buffer = true })
 
       -- change severity
       vim.keymap.set("n", keymap.change_severity, function()
@@ -289,7 +289,7 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Change severity" })
+      end, { desc = "Change severity", buffer = true })
 
       -- change priority
       vim.keymap.set("n", keymap.change_priority, function()
@@ -299,7 +299,7 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Change priority" })
+      end, { desc = "Change priority", buffer = true })
 
       -- change status
       vim.keymap.set("n", keymap.change_status, function()
@@ -309,7 +309,7 @@ local function _render_tree(props)
           renderer:close()
           M.render(props)
         end)
-      end, { desc = "Change status" })
+      end, { desc = "Change status", buffer = true })
     end,
     on_mount = function(component)
       component:set_border_text("bottom", " " .. props.options.keymap.help .. " help ", "left")
