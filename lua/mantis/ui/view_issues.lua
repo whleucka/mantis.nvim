@@ -327,7 +327,7 @@ local function _render_tree(props)
       end, { desc = "Change status", buffer = true })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help  [page: " .. props.page .. "]", "right")
+      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help  [page: " .. props.page .. "] ", "right")
     end,
     on_select = function(node, component)
       if node.type == 'project' then
