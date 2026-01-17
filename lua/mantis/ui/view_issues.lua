@@ -2,6 +2,8 @@ local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
 
+local collapsed_projects = {}
+
 local function _build_nodes(issues)
   local projects = {}
 
@@ -15,8 +17,17 @@ local function _build_nodes(issues)
 
   local nodes = {}
 
+  local sorted_projects = {}
+  for _, project_entry in pairs(projects) do
+    table.insert(sorted_projects, project_entry)
+  end
+  table.sort(sorted_projects, function(a, b)
+    return a.project.name < b.project.name
+  end)
+
   -- flatten issues
-  for _, entry in pairs(projects) do
+  for _, entry in ipairs(sorted_projects) do
+    local pid = entry.project.id
     -- sort issues by updated_at
     table.sort(entry.issues, function(a, b)
       return a.updated_at > b.updated_at
@@ -28,15 +39,16 @@ local function _build_nodes(issues)
       count = #entry.issues,
     }
     table.insert(nodes, n.node(_payload))
-    for i, issue in ipairs(entry.issues) do
-      if issue.expanded == nil then issue.expanded = true end
-      local _issue = {
-        index = i,
-        count = #entry.issues,
-        type = 'issue',
-        issue = issue,
-      }
-      table.insert(nodes, n.node(_issue))
+    if not collapsed_projects[pid] then
+      for i, issue in ipairs(entry.issues) do
+        local _issue = {
+          index = i,
+          count = #entry.issues,
+          type = 'issue',
+          issue = issue,
+        }
+        table.insert(nodes, n.node(_issue))
+      end
     end
   end
 
@@ -54,14 +66,9 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
-  -- local function _toggle_expand(project_id)
-  --   for i, issue in ipairs(props.issues) do
-  --     if issue.project.id == project_id then
-  --       local expanded = props.issues[i].expanded
-  --       props.issues[i].expanded = not expanded
-  --     end
-  --   end
-  -- end
+    local function _toggle_expand(project_id)
+    collapsed_projects[project_id] = not collapsed_projects[project_id]
+  end
 
 
   local function _get_help()
@@ -206,9 +213,6 @@ local function _render_tree(props)
       if node.type == 'issue' then
         local issue = node.issue
         signal.selected = issue
-      elseif node.type == 'project' then
-        local project = node.project
-        signal.selected = project
       end
     end,
     on_focus = function(state)
@@ -317,12 +321,11 @@ local function _render_tree(props)
       component:set_border_text("bottom", " " .. props.options.keymap.help .. " help ", "left")
     end,
     on_select = function(node, component)
-      -- TODO this works, but it causes errors because scrollable height has changed
-      -- if node.type == 'project' then
-      --   _toggle_expand(node.project.id)
-      --   renderer:close()
-      --   M.render(props)
-      -- end
+      if node.type == 'project' then
+        _toggle_expand(node.project.id)
+        renderer:close()
+        M.render(props)
+      end
     end,
     prepare_node = function(node, line, component)
       local type = node.type
@@ -333,7 +336,6 @@ local function _render_tree(props)
         line:append(n.text(string.format(" %s (%d)", project.name, node.count), "Directory"))
       elseif type == 'issue' then
         local issue = node.issue
-        if not issue.expanded then return end
         local columns = props.options.ui.columns
 
         if node.index == node.count then
