@@ -40,8 +40,8 @@ M.options = {
       }
     },
     keymap = {
-      next_page = "<C-n>",
-      prev_page = "<C-p>",
+      next_page = "L",
+      prev_page = "H",
       add_note = "n",
       create_issue = "c",
       open_issue = "o",
