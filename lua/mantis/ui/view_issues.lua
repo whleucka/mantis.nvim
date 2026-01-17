@@ -230,7 +230,7 @@ local function _render_tree(props)
         signal.selected = issue
       end
     end,
-    on_focus = function(state)
+    on_focus = function()
       local keymap = props.options.keymap
       -- show help
       vim.keymap.set("n", keymap.help, function()
@@ -270,18 +270,24 @@ local function _render_tree(props)
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()
         props.on_prev_page(function(issues)
-          props.issues = issues
-          renderer:close()
-          M.render(props)
+          if issues then
+            props.page = props.page - 1
+            props.issues = issues
+            renderer:close()
+            M.render(props)
+          end
         end)
       end, { desc = "Prev page", buffer = true })
 
       -- next page
       vim.keymap.set("n", keymap.next_page, function()
         props.on_next_page(function(issues)
-          props.issues = issues
-          renderer:close()
-          M.render(props)
+          if issues then
+            props.page = props.page + 1
+            props.issues = issues
+            renderer:close()
+            M.render(props)
+          end
         end)
       end, { desc = "Next page", buffer = true })
 
@@ -321,7 +327,7 @@ local function _render_tree(props)
       end, { desc = "Change status", buffer = true })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help ", "left")
+      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help  [page: " .. props.page .. "]", "right")
     end,
     on_select = function(node, component)
       if node.type == 'project' then
