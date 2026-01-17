@@ -1,20 +1,19 @@
 local M = {}
 
-local host_config = nil
+-- local host_config = nil -- Removed module-level host_config
 local config = require('mantis.config')
 local curl = require('plenary.curl')
 
 function M.new(host_name)
-  host_config = config.options.hosts[host_name]
-  if not host_config then
+  local instance = {} -- Create instance first
+  instance.host_config = config.options.hosts[host_name] -- Store host_config in instance
+  if not instance.host_config then
     vim.notify('Mantis: Host "' .. (host_name or 'default') .. '" not configured.', vim.log.levels.ERROR)
     return nil
   end
 
-  local instance = {
-    url = host_config.url,
-    token = host_config.token or os.getenv('MANTIS_API_TOKEN'),
-  }
+  instance.url = instance.host_config.url
+  instance.token = instance.host_config.token or os.getenv('MANTIS_API_TOKEN')
 
   if not instance.url or not instance.token then
     vim.notify('Mantis: URL or token not configured for host "' .. (host_name or 'default') .. '".', vim.log.levels
@@ -25,18 +24,18 @@ function M.new(host_name)
   return setmetatable(instance, { __index = M })
 end
 
-local function call_api(endpoint, method, data)
-  if host_config == nil then
+function M:call_api(endpoint, method, data)
+  if self.host_config == nil then
     return
   end
 
   method = method or 'GET'
   local headers = {
-    ['Authorization'] = host_config.token,
+    ['Authorization'] = self.host_config.token,
     ['Content-Type'] = 'application/json',
   }
 
-  local url = host_config.url .. '/api/rest/' .. endpoint
+  local url = self.host_config.url .. '/api/rest/' .. endpoint
 
   local opts = {
     headers = headers,
@@ -102,99 +101,99 @@ end
 
 --- Issues
 function M:get_issue(id)
-  return call_api('issues/' .. id)
+  return self:call_api('issues/' .. id)
 end
 
 function M:get_issues(page_size, page)
   page_size = page_size or 10
   page = page or 1
-  return call_api('issues?page_size=' .. page_size .. '&page=' .. page)
+  return self:call_api('issues?page_size=' .. page_size .. '&page=' .. page)
 end
 
 function M:create_issue(data)
-  return call_api('issues', 'POST', data)
+  return self:call_api('issues', 'POST', data)
 end
 
 function M:update_issue(id, data)
-  return call_api('issues/' .. id, 'PATCH', data)
+  return self:call_api('issues/' .. id, 'PATCH', data)
 end
 
 function M:delete_issue(id)
-  return call_api('issues/' .. id, 'DELETE')
+  return self:call_api('issues/' .. id, 'DELETE')
 end
 
 function M:get_issue_files(issue_id)
-  return call_api('issues/' .. issue_id .. '/files', 'GET')
+  return self:call_api('issues/' .. issue_id .. '/files', 'GET')
 end
 
 function M:get_issue_file(issue_id, file_id)
-  return call_api('issues/' .. issue_id .. '/files/' .. file_id, 'GET')
+  return self:call_api('issues/' .. issue_id .. '/files/' .. file_id, 'GET')
 end
 
 function M:get_project_issues(project_id)
-  return call_api('issues?project_id=' .. project_id, 'GET')
+  return self:call_api('issues?project_id=' .. project_id, 'GET')
 end
 
 function M:get_project_users(project_id)
-  return call_api('projects/' .. project_id .. '/users', 'GET')
+  return self:call_api('projects/' .. project_id .. '/users', 'GET')
 end
 
 function M:get_filtered_issues(filter_id)
-  return call_api('issues?filter_id=' .. filter_id, 'GET')
+  return self:call_api('issues?filter_id=' .. filter_id, 'GET')
 end
 
 function M:get_all_issues()
-  return call_api('issues', 'GET')
+  return self:call_api('issues', 'GET')
 end
 
 function M:get_all_projects()
-  return call_api('projects', 'GET')
+  return self:call_api('projects', 'GET')
 end
 
 function M:get_my_assigned_issues(page_size, page)
   page_size = page_size or 10
   page = page or 1
-  return call_api('issues?filter_id=assigned&page_size=' .. page_size .. '&page=' .. page, 'GET')
+  return self:call_api('issues?filter_id=assigned&page_size=' .. page_size .. '&page=' .. page, 'GET')
 end
 
 function M:get_my_reported_issues()
-  return call_api('issues?filter_id=reported', 'GET')
+  return self:call_api('issues?filter_id=reported', 'GET')
 end
 
 function M:get_my_monitored_issues()
-  return call_api('issues?filter_id=monitored', 'GET')
+  return self:call_api('issues?filter_id=monitored', 'GET')
 end
 
 function M:get_unassigned_issues()
-  return call_api('issues?filter_id=unassigned', 'GET')
+  return self:call_api('issues?filter_id=unassigned', 'GET')
 end
 
 function M:add_attachments_to_issue(issue_id, data)
-  return call_api('issues/' .. issue_id .. '/files', 'POST', data)
+  return self:call_api('issues/' .. issue_id .. '/files', 'POST', data)
 end
 
 function M:create_issue_note(issue_id, data)
-  return call_api('issues/' .. issue_id .. '/notes', 'POST', data)
+  return self:call_api('issues/' .. issue_id .. '/notes', 'POST', data)
 end
 
 function M:delete_issue_note(issue_id, note_id)
-  return call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'DELETE')
+  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'DELETE')
 end
 
 function M:monitor_issue(issue_id)
-  return call_api('issues/' .. issue_id .. '/monitors', 'POST')
+  return self:call_api('issues/' .. issue_id .. '/monitors', 'POST')
 end
 
 function M:add_tags_to_issue(issue_id, data)
-  return call_api('issues/' .. issue_id .. '/tags', 'POST', data)
+  return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data)
 end
 
 function M:remove_tags_from_issue(issue_id, data)
-  return call_api('issues/' .. issue_id .. '/tags', 'POST', data)
+  return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data)
 end
 
 function M:add_issue_relationship(issue_id, data)
-  return call_api('issues/' .. issue_id .. '/relationships/', 'POST', data)
+  return self:call_api('issues/' .. issue_id .. '/relationships/', 'POST', data)
 end
 
 return M
