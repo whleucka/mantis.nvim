@@ -104,10 +104,43 @@ function M:get_issue(id)
   return self:call_api('issues/' .. id)
 end
 
-function M:get_issues(page_size, page)
-  page_size = page_size or 10
-  page = page or 1
-  return self:call_api('issues?page_size=' .. page_size .. '&page=' .. page)
+function M:get_issues(opts_or_page_size, page)
+  local opts
+  if type(opts_or_page_size) == 'table' then
+    opts = opts_or_page_size
+  else
+    opts = {
+      page_size = opts_or_page_size,
+      page = page,
+    }
+  end
+
+  opts = opts or {}
+  local query_params = {}
+
+  if opts.page_size then
+    table.insert(query_params, 'page_size=' .. opts.page_size)
+  end
+
+  if opts.page then
+    table.insert(query_params, 'page=' .. opts.page)
+  end
+
+  if opts.project_id then
+    table.insert(query_params, 'project_id=' .. opts.project_id)
+  end
+
+  if opts.filter_id then
+    table.insert(query_params, 'filter_id=' .. opts.filter_id)
+  end
+
+  local query_string = table.concat(query_params, '&')
+  local endpoint = 'issues'
+  if query_string ~= '' then
+    endpoint = endpoint .. '?' .. query_string
+  end
+
+  return self:call_api(endpoint)
 end
 
 function M:create_issue(data)
@@ -131,7 +164,7 @@ function M:get_issue_file(issue_id, file_id)
 end
 
 function M:get_project_issues(project_id)
-  return self:call_api('issues?project_id=' .. project_id, 'GET')
+  return self:get_issues({ project_id = project_id })
 end
 
 function M:get_project_users(project_id)
@@ -139,11 +172,11 @@ function M:get_project_users(project_id)
 end
 
 function M:get_filtered_issues(filter_id)
-  return self:call_api('issues?filter_id=' .. filter_id, 'GET')
+  return self:get_issues({ filter_id = filter_id })
 end
 
 function M:get_all_issues()
-  return self:call_api('issues', 'GET')
+  return self:get_issues()
 end
 
 function M:get_all_projects()
@@ -151,21 +184,19 @@ function M:get_all_projects()
 end
 
 function M:get_my_assigned_issues(page_size, page)
-  page_size = page_size or 10
-  page = page or 1
-  return self:call_api('issues?filter_id=assigned&page_size=' .. page_size .. '&page=' .. page, 'GET')
+  return self:get_issues({ filter_id = 'assigned', page_size = page_size, page = page })
 end
 
 function M:get_my_reported_issues()
-  return self:call_api('issues?filter_id=reported', 'GET')
+  return self:get_issues({ filter_id = 'reported' })
 end
 
 function M:get_my_monitored_issues()
-  return self:call_api('issues?filter_id=monitored', 'GET')
+  return self:get_issues({ filter_id = 'monitored' })
 end
 
 function M:get_unassigned_issues()
-  return self:call_api('issues?filter_id=unassigned', 'GET')
+  return self:get_issues({ filter_id = 'unassigned' })
 end
 
 function M:add_attachments_to_issue(issue_id, data)
@@ -188,8 +219,8 @@ function M:add_tags_to_issue(issue_id, data)
   return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data)
 end
 
-function M:remove_tags_from_issue(issue_id, data)
-  return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data)
+function M:remove_tags_from_issue(issue_id, tag_id)
+  return self:call_api('issues/' .. issue_id .. '/tags/' .. tag_id, 'DELETE')
 end
 
 function M:add_issue_relationship(issue_id, data)

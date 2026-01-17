@@ -53,7 +53,41 @@ M.options = {
       refresh = "r",
       quit = "q",
     }
-  }
+  },
+  issue_status_options = {
+    "new",
+    "feedback",
+    "acknowledged",
+    "confirmed",
+    "resolved",
+    "closed",
+  },
+  issue_severity_options = {
+    "feature",
+    "trivial",
+    "text",
+    "tweak",
+    "minor",
+    "major",
+    "crash",
+    "block",
+  },
+  issue_priority_options = {
+    "none",
+    "low",
+    "normal",
+    "high",
+    "urgent",
+    "immediate",
+  },
+  priority_emojis = {
+    immediate = "🔥",
+    urgent    = "⚠️",
+    high      = "🔴",
+    normal    = "🟢",
+    low       = "🔵",
+    default   = "⚪"
+  },
 }
 
 function M.setup(options)

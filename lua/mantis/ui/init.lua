@@ -3,35 +3,41 @@ local M = {}
 local util = require("mantis.util")
 local config = require("mantis.config")
 local api = require("mantis.api")
-local current_host = nil
-local current_page = 1
-local hosts = config.options.hosts
-local page_size = config.options.view_issues.limit
+
+-- Centralized state table
+local _state = {
+  current_host = nil,
+  current_page = 1,
+  hosts = config.options.hosts,
+  page_size = config.options.view_issues.limit,
+  collapsed_projects = {}, -- Moved from view_issues.lua
+}
 
 local function _set_host(host)
-  current_host = host
+  _state.current_host = host
 end
 
 local function _mantis()
-  if current_host == nil then
+  if _state.current_host == nil then
     return
   end
-  return api.new(current_host)
+  return api.new(_state.current_host)
 end
 
 -- view issues table
 function M.view_issues()
   local ViewIssues = require("mantis.ui.view_issues")
-  local res = _mantis():get_issues(page_size, current_page)
+  local res = _mantis():get_issues(_state.page_size, _state.current_page)
   local issues = (res and res.issues) or {}
 
   -- show view issues
   ViewIssues.render({
-    page = current_page,
-    current_host = current_host,
-    host = config.options.hosts[current_host],
+    page = _state.current_page,
+    current_host = _state.current_host,
+    host = config.options.hosts[_state.current_host],
     options = config.options.view_issues,
     issues = issues,
+    collapsed_projects = _state.collapsed_projects, -- Pass collapsed_projects
     on_add_note = function(issue_id, cb)
       M.add_note(issue_id, cb)
     end,
@@ -112,7 +118,7 @@ end
 
 -- refresh issues
 function M.refresh(cb)
-  local res = _mantis():get_issues(page_size, current_page)
+  local res = _mantis():get_issues(_state.page_size, _state.current_page)
   local issues = (res and res.issues) or {}
   if next(issues) ~= nil and cb then
     vim.notify("MantisBT issues refreshed", vim.log.levels.INFO)
@@ -122,23 +128,23 @@ end
 
 -- previous page of issues
 function M.prev_page(cb)
-  local prev_page = current_page - 1
+  local prev_page = _state.current_page - 1
   if prev_page < 1 then return end
-  local res = _mantis():get_issues(page_size, prev_page)
+  local res = _mantis():get_issues(_state.page_size, prev_page)
   local issues = (res and res.issues) or {}
   if next(issues) ~= nil and cb then
-    current_page = prev_page
+    _state.current_page = prev_page
     cb(issues)
   end
 end
 
 -- next page of issues
 function M.next_page(cb)
-  local next_page = current_page + 1
-  local res = _mantis():get_issues(page_size, next_page)
+  local next_page = _state.current_page + 1
+  local res = _mantis():get_issues(_state.page_size, next_page)
   local issues = (res and res.issues) or {}
   if next(issues) ~= nil and cb then
-    current_page = next_page
+    _state.current_page = next_page
     cb(issues)
   end
 end
@@ -167,87 +173,39 @@ function M.assign_user(issue_id, project_id, cb)
   end)
 end
 
--- change the status of a MantisBT issue
-function M.change_status(issue_id, cb)
-  local options = {
-    "new",
-    "feedback",
-    "acknowledged",
-    "confirmed",
-    "resolved",
-    "closed",
-  }
-  vim.ui.select(options, { prompt = "Select a status" }, function(status)
-    if not status then return end
-    local res = _mantis():update_issue(issue_id, {
-      status = {
-        name = status
-      }
-    })
+local function _change_issue_property(issue_id, property, options, cb)
+  vim.ui.select(options, { prompt = "Select a " .. property }, function(value)
+    if not value then return end
+    local payload = {}
+    payload[property] = { name = value }
+    local res = _mantis():update_issue(issue_id, payload)
 
-    if status and cb then
+    if value and cb then
       local issue = (res and res.issues[1]) or {}
       cb(issue)
     end
   end)
+end
+
+-- change the status of a MantisBT issue
+function M.change_status(issue_id, cb)
+  _change_issue_property(issue_id, "status", config.options.issue_status_options, cb)
 end
 
 -- change the severity of a MantisBT issue
 function M.change_severity(issue_id, cb)
-  local options = {
-    "feature",
-    "trivial",
-    "text",
-    "tweak",
-    "minor",
-    "major",
-    "crash",
-    "block",
-  }
-  vim.ui.select(options, { prompt = "Select a severity" }, function(severity)
-    if not severity then return end
-    local res = _mantis():update_issue(issue_id, {
-      severity = {
-        name = severity
-      }
-    })
-
-    if severity and cb then
-      local issue = (res and res.issues[1]) or {}
-      cb(issue)
-    end
-  end)
+  _change_issue_property(issue_id, "severity", config.options.issue_severity_options, cb)
 end
 
 -- change the priority of a MantisBT issue
 function M.change_priority(issue_id, cb)
-  local options = {
-    "none",
-    "low",
-    "normal",
-    "high",
-    "urgent",
-    "immediate",
-  }
-  vim.ui.select(options, { prompt = "Select a priority" }, function(priority)
-    if not priority then return end
-    local res = _mantis():update_issue(issue_id, {
-      priority = {
-        name = priority
-      }
-    })
-
-    if priority and cb then
-      local issue = (res and res.issues[1]) or {}
-      cb(issue)
-    end
-  end)
+  _change_issue_property(issue_id, "priority", config.options.issue_priority_options, cb)
 end
 
 -- select a host from the config
 function M.host_select()
   local HostSelect = require("mantis.ui.selector")
-  local count = vim.tbl_count(hosts)
+  local count = vim.tbl_count(_state.hosts)
 
   -- no hosts
   if count == 0 then
@@ -257,7 +215,7 @@ function M.host_select()
 
   -- only one host
   if count == 1 then
-    local host, _ = next(hosts)
+    local host, _ = next(_state.hosts)
     _set_host(host)
     M.view_issues()
     return
@@ -267,7 +225,7 @@ function M.host_select()
   HostSelect.render({
     title = "Select MantisBT Host",
     options = config.options.selector,
-    items = hosts,
+    items = _state.hosts,
     on_submit = function(id)
       _set_host(id)
       M.view_issues()

@@ -1,10 +1,9 @@
 local M = {}
 local n = require("nui-components")
 local util = require("mantis.util")
+local config = require("mantis.config")
 
-local collapsed_projects = {}
-
-local function _build_nodes(issues)
+local function _build_nodes(issues, collapsed_projects)
   local projects = {}
 
   for _, issue in ipairs(issues) do
@@ -67,7 +66,7 @@ local function _render_tree(props)
   })
 
     local function _toggle_expand(project_id)
-    collapsed_projects[project_id] = not collapsed_projects[project_id]
+    props.collapsed_projects[project_id] = not props.collapsed_projects[project_id]
   end
 
 
@@ -208,7 +207,7 @@ local function _render_tree(props)
     flex = 1,
     autofocus = true,
     border_label = " MantisBT Issues [" .. props.current_host .. "] ",
-    data = _build_nodes(props.issues),
+    data = _build_nodes(props.issues, props.collapsed_projects),
     on_change = function(node)
       if node.type == 'issue' then
         local issue = node.issue
@@ -350,17 +349,10 @@ local function _render_tree(props)
         vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
 
         if columns.priority then
-          local priority_emoji = {
-            immediate = "🔥",
-            urgent    = "⚠️",
-            high      = "🔴",
-            normal    = "🟢",
-            low       = "🔵",
-            default   = "⚪"
-          }
+          local priority_emojis = config.options.priority_emojis
           local label = issue.priority.label
           local key = label:lower()
-          local emoji = priority_emoji[key] or priority_emoji['default']
+          local emoji = priority_emojis[key] or priority_emojis['default']
           if issue.status.label == 'resolved' or issue.status.label == 'closed' then
             emoji = "✅"
           end
