@@ -203,6 +203,22 @@ local function _render_tree(props)
     end
   end
 
+  local function _change_issue_property(issue_id, property, options)
+    vim.ui.select(options, { prompt = "Select a " .. property }, function(value)
+      if not value then return end
+      local payload = {}
+      payload[property] = { name = value }
+      local res = props.mantis_api_client_factory():update_issue(issue_id, payload)
+
+      if value and res then
+        local issue = (res and res.issues[1]) or {}
+        _update_issue(issue)
+        renderer:close()
+        M.render(props)
+      end
+    end)
+  end
+
   local tree = n.tree({
     flex = 1,
     autofocus = true,
@@ -289,31 +305,19 @@ local function _render_tree(props)
       -- change severity
       vim.keymap.set("n", keymap.change_severity, function()
         local issue = signal.selected:get_value()
-        props.on_change_severity(issue.id, function(new_issue)
-          _update_issue(new_issue)
-          renderer:close()
-          M.render(props)
-        end)
+        _change_issue_property(issue.id, "severity", config.options.issue_severity_options)
       end, { desc = "Change severity", buffer = true })
 
       -- change priority
       vim.keymap.set("n", keymap.change_priority, function()
         local issue = signal.selected:get_value()
-        props.on_change_priority(issue.id, function(new_issue)
-          _update_issue(new_issue)
-          renderer:close()
-          M.render(props)
-        end)
+        _change_issue_property(issue.id, "priority", config.options.issue_priority_options)
       end, { desc = "Change priority", buffer = true })
 
       -- change status
       vim.keymap.set("n", keymap.change_status, function()
         local issue = signal.selected:get_value()
-        props.on_change_status(issue.id, function(new_issue)
-          _update_issue(new_issue)
-          renderer:close()
-          M.render(props)
-        end)
+        _change_issue_property(issue.id, "status", config.options.issue_status_options)
       end, { desc = "Change status", buffer = true })
     end,
     on_mount = function(component)

@@ -86,9 +86,7 @@ function M:call_api(endpoint, method, data)
         error_message = response.body
       end
     end
-    if config.options.debug then
-      vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
-    end
+    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR) -- Always notify
     return nil
   end
 

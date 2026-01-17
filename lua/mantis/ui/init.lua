@@ -38,20 +38,12 @@ function M.view_issues()
     options = config.options.view_issues,
     issues = issues,
     collapsed_projects = _state.collapsed_projects, -- Pass collapsed_projects
+    mantis_api_client_factory = _mantis, -- Pass _mantis function
     on_add_note = function(issue_id, cb)
       M.add_note(issue_id, cb)
     end,
     on_create_issue = function(cb)
       M.create_issue(cb)
-    end,
-    on_change_severity = function(issue_id, cb)
-      M.change_severity(issue_id, cb)
-    end,
-    on_change_priority = function(issue_id, cb)
-      M.change_priority(issue_id, cb)
-    end,
-    on_change_status = function(issue_id, cb)
-      M.change_status(issue_id, cb)
     end,
     on_assign_user = function(issue_id, project_id, cb)
       M.assign_user(issue_id, project_id, cb)
@@ -171,35 +163,6 @@ function M.assign_user(issue_id, project_id, cb)
       cb(issue)
     end
   end)
-end
-
-local function _change_issue_property(issue_id, property, options, cb)
-  vim.ui.select(options, { prompt = "Select a " .. property }, function(value)
-    if not value then return end
-    local payload = {}
-    payload[property] = { name = value }
-    local res = _mantis():update_issue(issue_id, payload)
-
-    if value and cb then
-      local issue = (res and res.issues[1]) or {}
-      cb(issue)
-    end
-  end)
-end
-
--- change the status of a MantisBT issue
-function M.change_status(issue_id, cb)
-  _change_issue_property(issue_id, "status", config.options.issue_status_options, cb)
-end
-
--- change the severity of a MantisBT issue
-function M.change_severity(issue_id, cb)
-  _change_issue_property(issue_id, "severity", config.options.issue_severity_options, cb)
-end
-
--- change the priority of a MantisBT issue
-function M.change_priority(issue_id, cb)
-  _change_issue_property(issue_id, "priority", config.options.issue_priority_options, cb)
 end
 
 -- select a host from the config
