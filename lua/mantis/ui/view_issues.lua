@@ -54,14 +54,14 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
-  local function _toggle_expand(project_id)
-    for i, issue in ipairs(props.issues) do
-      if issue.project.id == project_id then
-        local expanded = props.issues[i].expanded
-        props.issues[i].expanded = not expanded
-      end
-    end
-  end
+  -- local function _toggle_expand(project_id)
+  --   for i, issue in ipairs(props.issues) do
+  --     if issue.project.id == project_id then
+  --       local expanded = props.issues[i].expanded
+  --       props.issues[i].expanded = not expanded
+  --     end
+  --   end
+  -- end
 
 
   local function _get_help()
@@ -236,14 +236,16 @@ local function _render_tree(props)
       -- add note
       vim.keymap.set("n", keymap.add_note, function()
         local issue = signal.selected:get_value()
-        props.on_add_note(issue.id)
-        renderer:close()
+        props.on_add_note(issue.id, function()
+          renderer:close()
+        end)
       end, { desc = "Add note", buffer = true })
 
       -- create new issue
       vim.keymap.set("n", keymap.create_issue, function()
-        props.on_create_issue()
-        renderer:close()
+        props.on_create_issue(function()
+          renderer:close()
+        end)
       end, { desc = "Create new issue", buffer = true })
 
       -- prev page
@@ -416,6 +418,7 @@ local function _render_tree(props)
     lines = _get_help(),
     align = "center"
   })
+
   renderer:render(n.rows(
     tree,
     help

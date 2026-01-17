@@ -49,7 +49,7 @@ M.options = {
       change_status = "s",
       change_severity = "v",
       change_priority = "p",
-      help = "h",
+      help = "?",
       refresh = "r",
       quit = "q",
     }

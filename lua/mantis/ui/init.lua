@@ -19,8 +19,52 @@ local function _mantis()
   return api.new(current_host)
 end
 
-function M.add_note(issue_id)
+-- view issues table
+function M.view_issues()
+  local ViewIssues = require("mantis.ui.view_issues")
+  local res = _mantis():get_issues(page_size, current_page)
+  local issues = (res and res.issues) or {}
+
+  -- show view issues
+  ViewIssues.render({
+    page = current_page,
+    current_host = current_host,
+    host = config.options.hosts[current_host],
+    options = config.options.view_issues,
+    issues = issues,
+    on_add_note = function(issue_id, cb)
+      M.add_note(issue_id, cb)
+    end,
+    on_create_issue = function(cb)
+      M.create_issue(cb)
+    end,
+    on_change_severity = function(issue_id, cb)
+      M.change_severity(issue_id, cb)
+    end,
+    on_change_priority = function(issue_id, cb)
+      M.change_priority(issue_id, cb)
+    end,
+    on_change_status = function(issue_id, cb)
+      M.change_status(issue_id, cb)
+    end,
+    on_assign_user = function(issue_id, project_id, cb)
+      M.assign_user(issue_id, project_id, cb)
+    end,
+    on_prev_page = function(cb)
+      M.prev_page(cb)
+    end,
+    on_next_page = function(cb)
+      M.next_page(cb)
+    end,
+    on_refresh = function(cb)
+      M.refresh(cb)
+    end,
+  })
+end
+
+function M.add_note(issue_id, cb)
   local AddNote = require("mantis.ui.add_note")
+  cb()
   AddNote.render({
     issue_id = issue_id,
     options = config.options.add_note,
@@ -32,7 +76,7 @@ function M.add_note(issue_id)
 end
 
 -- create a new issue
-function M.create_issue()
+function M.create_issue(cb)
   local CreateIssue = require("mantis.ui.create_issue")
   local res = _mantis():get_all_projects()
   local projects = (res and res.projects) or {}
@@ -59,53 +103,11 @@ function M.create_issue()
       options = config.options.create_issue,
       on_submit = function(new_issue)
         _mantis():create_issue(new_issue)
+        cb()
         M.view_issues()
       end
     })
   end)
-end
-
--- view issues table
-function M.view_issues()
-  local ViewIssues = require("mantis.ui.view_issues")
-  local res = _mantis():get_issues(page_size, current_page)
-  local issues = (res and res.issues) or {}
-
-  -- show view issues
-  ViewIssues.render({
-    page = current_page,
-    current_host = current_host,
-    host = config.options.hosts[current_host],
-    options = config.options.view_issues,
-    issues = issues,
-    on_add_note = function(issue_id)
-      M.add_note(issue_id)
-    end,
-    on_create_issue = function()
-      M.create_issue()
-    end,
-    on_change_severity = function(issue_id, cb)
-      M.change_severity(issue_id, cb)
-    end,
-    on_change_priority = function(issue_id, cb)
-      M.change_priority(issue_id, cb)
-    end,
-    on_change_status = function(issue_id, cb)
-      M.change_status(issue_id, cb)
-    end,
-    on_assign_user = function(issue_id, project_id, cb)
-      M.assign_user(issue_id, project_id, cb)
-    end,
-    on_prev_page = function(cb)
-      M.prev_page(cb)
-    end,
-    on_next_page = function(cb)
-      M.next_page(cb)
-    end,
-    on_refresh = function(cb)
-      M.refresh(cb)
-    end,
-  })
 end
 
 -- refresh issues
