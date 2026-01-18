@@ -54,6 +54,48 @@ local function _build_nodes(issues, collapsed_projects)
   return nodes
 end
 
+local function _format_issue_details(issue)
+  local lines = {}
+
+  table.insert(lines, string.format("# Issue #%s: %s", issue.id, issue.summary))
+  table.insert(lines, "")
+  table.insert(lines, string.format("**Project**: %s", issue.project.name))
+  table.insert(lines, string.format("**Category**: %s", issue.category.name))
+  table.insert(lines, string.format("**Reporter**: %s (%s)", issue.reporter.real_name, issue.reporter.name))
+  table.insert(lines, "")
+  table.insert(lines, string.format("**Status**: %s", issue.status.label))
+  table.insert(lines, string.format("**Resolution**: %s", issue.resolution.label))
+  table.insert(lines, string.format("**Priority**: %s", issue.priority.label))
+  table.insert(lines, string.format("**Severity**: %s", issue.severity.label))
+  table.insert(lines, "")
+  table.insert(lines, string.format("**Created**: %s", util.time_ago(util.parse_iso8601(issue.created_at))))
+  table.insert(lines, string.format("**Updated**: %s", util.time_ago(util.parse_iso8601(issue.updated_at))))
+  table.insert(lines, "")
+  table.insert(lines, "## Description")
+  table.insert(lines, issue.description)
+  table.insert(lines, "")
+
+  if issue.custom_fields and #issue.custom_fields > 0 then
+    table.insert(lines, "## Custom Fields")
+    for _, field in ipairs(issue.custom_fields) do
+      table.insert(lines, string.format("- **%s**: %s", field.field.name, field.value))
+    end
+    table.insert(lines, "")
+  end
+
+  if issue.history and #issue.history > 0 then
+    table.insert(lines, "## History")
+    for _, item in ipairs(issue.history) do
+        local user = item.user.real_name or item.user.name
+        local t = util.time_ago(util.parse_iso8601(item.created_at))
+        table.insert(lines, string.format("- [%s] **%s**: %s", t, user, item.message))
+    end
+    table.insert(lines, "")
+  end
+
+  return lines
+end
+
 local function _render_tree(props)
   local signal   = n.create_signal({
     selected = nil,
@@ -334,6 +376,49 @@ local function _render_tree(props)
         _toggle_expand(node.project.id)
         renderer:close()
         M.render(props)
+      elseif node.type == 'issue' then
+        local issue = node.issue
+
+        -- 1. Create buffer
+        local buf = vim.api.nvim_create_buf(false, true)
+        vim.bo[buf].filetype = "markdown"
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Fetching issue details..." })
+
+        -- 2. Window config
+        local width = math.floor(vim.o.columns * 0.8)
+        local height = math.floor(vim.o.lines * 0.8)
+        local row = math.floor((vim.o.lines - height) / 2)
+        local col = math.floor((vim.o.columns - width) / 2)
+
+        local win_config = {
+          style = "minimal",
+          relative = "editor",
+          width = width,
+          height = height,
+          row = row,
+          col = col,
+          border = "single",
+          zindex = 150,
+        }
+
+        -- 3. Open window
+        local win = vim.api.nvim_open_win(buf, true, win_config)
+
+        -- 4. Set keymap
+        vim.keymap.set("n", "q", function()
+          vim.api.nvim_win_close(win, true)
+        end, { buffer = buf, nowait = true })
+
+        vim.api.nvim_buf_set_option(buf, 'modifiable', true)
+        local res = props.mantis_api_client_factory():get_issue(issue.id)
+        if res and res.issues and #res.issues > 0 then
+          local issue_details = res.issues[1]
+          local lines = _format_issue_details(issue_details)
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+        else
+          vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get issue details." })
+        end
+        vim.api.nvim_buf_set_option(buf, 'modifiable', false)
       end
     end,
     prepare_node = function(node, line, component)
