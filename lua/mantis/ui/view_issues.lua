@@ -114,9 +114,9 @@ local function _format_issue_details(issue)
     table.insert(lines, "History")
     table.insert(lines, "")
     for _, item in ipairs(issue.history) do
-        local user = item.user.real_name or item.user.name
-        local t = util.time_ago(util.parse_iso8601(item.created_at))
-        _split_and_insert_lines(lines, string.format("- [%s] **%s**: %s", t, user, item.message))
+      local user = item.user.real_name or item.user.name
+      local t = util.time_ago(util.parse_iso8601(item.created_at))
+      _split_and_insert_lines(lines, string.format("- [%s] **%s**: %s", t, user, item.message))
     end
     table.insert(lines, "")
   end
@@ -135,7 +135,7 @@ local function _render_tree(props)
     height = props.options.ui.height,
   })
 
-    local function _toggle_expand(project_id)
+  local function _toggle_expand(project_id)
     props.collapsed_projects[project_id] = not props.collapsed_projects[project_id]
   end
 
@@ -289,6 +289,95 @@ local function _render_tree(props)
     end)
   end
 
+  local ns = vim.api.nvim_create_namespace("mantis_issue_preview")
+
+  local function create_floating_window(title)
+    local buf                 = vim.api.nvim_create_buf(false, true)
+    vim.bo[buf].filetype      = "markdown"
+
+    local width               = math.floor(vim.o.columns * 0.6)
+    local height              = math.floor(vim.o.lines * 0.6)
+    local row                 = math.floor((vim.o.lines - height) / 2)
+    local col                 = math.floor((vim.o.columns - width) / 2)
+
+    local win                 = vim.api.nvim_open_win(buf, true, {
+      style = "minimal",
+      relative = "editor",
+      width = width,
+      height = height,
+      row = row,
+      col = col,
+      border = "single",
+      zindex = 150,
+      title = title,
+    })
+
+    vim.wo[win].wrap          = true
+    vim.wo[win].conceallevel  = 2
+    vim.wo[win].concealcursor = "n"
+
+    vim.keymap.set("n", "q", function()
+      vim.api.nvim_win_close(win, true)
+    end, { buffer = buf, nowait = true })
+
+    return buf, win
+  end
+
+  local function highlight_issue_buffer(buf)
+    vim.api.nvim_buf_clear_namespace(buf, ns, 0, -1)
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+
+    for i, line in ipairs(lines) do
+      local row = i - 1
+
+      -- Title (first line)
+      if row == 0 then
+        vim.api.nvim_buf_set_extmark(buf, ns, row, 0, {
+          end_col = #line,
+          hl_group = "Title",
+        })
+      end
+
+      -- Section headers
+      if line == "Description"
+          or line == "Notes"
+          or line == "Custom Fields"
+          or line == "History"
+      then
+        vim.api.nvim_buf_set_extmark(buf, ns, row, 0, {
+          end_col = #line,
+          hl_group = "Title",
+        })
+      end
+
+      -- **bold**
+      local start = 1
+      while true do
+        local s, e = line:find("%*%*([^*]+)%*%*", start)
+        if not s then break end
+
+        -- Bold text
+        vim.api.nvim_buf_set_extmark(buf, ns, row, s, {
+          end_col = e - 2,
+          hl_group = "Statement",
+        })
+
+        -- Conceal **
+        vim.api.nvim_buf_set_extmark(buf, ns, row, s - 1, {
+          end_col = s + 1,
+          conceal = "",
+        })
+
+        vim.api.nvim_buf_set_extmark(buf, ns, row, e - 2, {
+          end_col = e,
+          conceal = "",
+        })
+
+        start = e + 1
+      end
+    end
+  end
+
   local tree = n.tree({
     flex = 1,
     autofocus = true,
@@ -397,90 +486,44 @@ local function _render_tree(props)
       end, { desc = "Change status", buffer = true })
     end,
     on_mount = function(component)
-      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help  [page: " .. props.page .. "] ", "right")
+      component:set_border_text("bottom", " " .. props.options.keymap.help .. " help  [page: " .. props.page .. "] ",
+        "right")
     end,
     on_select = function(node, component)
-      if node.type == 'project' then
+      if node.type == "project" then
         _toggle_expand(node.project.id)
         renderer:close()
         M.render(props)
-      elseif node.type == 'issue' then
-        local issue = node.issue
-
-        -- 1. Create buffer
-        local buf = vim.api.nvim_create_buf(false, true)
-        vim.bo[buf].filetype = "markdown"
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Fetching issue details..." })
-
-        -- 2. Window config
-        local width = math.floor(vim.o.columns * 0.8)
-        local height = math.floor(vim.o.lines * 0.8)
-        local row = math.floor((vim.o.lines - height) / 2)
-        local col = math.floor((vim.o.columns - width) / 2)
-
-        local win_config = {
-          style = "minimal",
-          relative = "editor",
-          width = width,
-          height = height,
-          row = row,
-          col = col,
-          border = "single",
-          zindex = 150,
-          title = "Issue #" .. issue.id,
-        }
-
-        -- 3. Open window
-        local win = vim.api.nvim_open_win(buf, true, win_config)
-        vim.wo[win].wrap = true
-
-        -- 4. Set keymap
-        vim.keymap.set("n", "q", function()
-          vim.api.nvim_win_close(win, true)
-        end, { buffer = buf, nowait = true })
-
-        vim.api.nvim_buf_set_option(buf, 'modifiable', true)
-        local res = props.mantis_api_client_factory():get_issue(issue.id)
-        if res and res.issues and #res.issues > 0 then
-          local issue_details = res.issues[1]
-          local lines = _format_issue_details(issue_details)
-          vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-
-          -- Apply highlights
-          vim.wo[win].conceallevel = 2
-          vim.wo[win].concealcursor = "n"
-          local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-          for i, line in ipairs(lines) do
-            local line_idx = i - 1
-
-            -- Highlight Title (first line)
-            if line_idx == 0 then
-              vim.api.nvim_buf_add_highlight(buf, -1, "Title", line_idx, 0, -1)
-            end
-
-            -- Highlight Section Headings
-            if line == "Description" or line == "Notes" or line == "Custom Fields" or line == "History" then
-              vim.api.nvim_buf_add_highlight(buf, -1, "Title", line_idx, 0, -1)
-            end
-
-            -- Bold
-            local start_pos = 1
-            while true do
-              local s, e = line:find("%*%*([^*]+)%*%*", start_pos)
-              if not s then break end
-              -- Highlight the text inside **...** as bold (using 'Bold' group)
-              vim.api.nvim_buf_add_highlight(buf, -1, "Bold", line_idx, s + 1, e - 2)
-              -- Conceal the asterisks
-              vim.api.nvim_buf_add_highlight(buf, -1, "Conceal", line_idx, s - 1, s + 1)
-              vim.api.nvim_buf_add_highlight(buf, -1, "Conceal", line_idx, e - 2, e)
-              start_pos = e + 1
-            end
-          end
-        else
-          vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get issue details." })
-        end
-        vim.api.nvim_buf_set_option(buf, 'modifiable', false)
+        return
       end
+
+      if node.type ~= "issue" then
+        return
+      end
+
+      local issue = node.issue
+      local buf, win = create_floating_window("Issue #" .. issue.id)
+
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+        "Fetching issue details..."
+      })
+
+      vim.bo[buf].modifiable = true
+
+      local res = props.mantis_api_client_factory():get_issue(issue.id)
+      if res and res.issues and #res.issues > 0 then
+        local issue_details = res.issues[1]
+        local lines = _format_issue_details(issue_details)
+
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+        highlight_issue_buffer(buf)
+      else
+        vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+          "Failed to get issue details."
+        })
+      end
+
+      vim.bo[buf].modifiable = false
     end,
     prepare_node = function(node, line, component)
       local type = node.type
