@@ -68,12 +68,18 @@ local function _format_issue_details(issue)
     end
   end
 
+  local status_bg = "MantisStatusBg_" .. issue.status.label
+  vim.api.nvim_set_hl(0, status_bg, { bg = issue.status.color })
+  local status_fg = "MantisStatusFg_" .. issue.status.label
+  vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
+
   table.insert(lines, string.format("Issue #%s: %s", issue.id, issue.summary))
   table.insert(lines, "")
   table.insert(lines, string.format("**Project**: %s", issue.project.name))
   table.insert(lines, string.format("**Category**: %s", issue.category.name))
   table.insert(lines, string.format("**Reporter**: %s (%s)", issue.reporter.real_name, issue.reporter.name))
   table.insert(lines, "")
+
   table.insert(lines, string.format("**Status**: %s", issue.status.label))
   table.insert(lines, string.format("**Resolution**: %s", issue.resolution.label))
   table.insert(lines, string.format("**Priority**: %s", issue.priority.label))
@@ -291,6 +297,20 @@ local function _render_tree(props)
 
   local ns = vim.api.nvim_create_namespace("mantis_issue_preview")
 
+  local function set_buffer_text(buf, lines)
+    vim.bo[buf].modifiable = true
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+    vim.bo[buf].modifiable = false
+  end
+
+  local function fetch_issue(props, issue_id)
+    local res = props.mantis_api_client_factory():get_issue(issue_id)
+    if not res or not res.issues or #res.issues == 0 then
+      return nil
+    end
+    return res.issues[1]
+  end
+
   local function create_floating_window(title)
     local buf                 = vim.api.nvim_create_buf(false, true)
     vim.bo[buf].filetype      = "markdown"
@@ -329,6 +349,7 @@ local function _render_tree(props)
 
     for i, line in ipairs(lines) do
       local row = i - 1
+
 
       -- Title (first line)
       if row == 0 then
@@ -490,6 +511,7 @@ local function _render_tree(props)
         "right")
     end,
     on_select = function(node, component)
+      -- Project toggle
       if node.type == "project" then
         _toggle_expand(node.project.id)
         renderer:close()
@@ -497,6 +519,7 @@ local function _render_tree(props)
         return
       end
 
+      -- Only care about issues from here on
       if node.type ~= "issue" then
         return
       end
@@ -504,34 +527,29 @@ local function _render_tree(props)
       local issue = node.issue
       local buf, win = create_floating_window("Issue #" .. issue.id)
 
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-        "Fetching issue details..."
-      })
+      -- Loading state
+      set_buffer_text(buf, { "Fetching issue details…" })
 
-      vim.bo[buf].modifiable = true
-
-      local res = props.mantis_api_client_factory():get_issue(issue.id)
-      if res and res.issues and #res.issues > 0 then
-        local issue_details = res.issues[1]
-        local lines = _format_issue_details(issue_details)
-
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-        highlight_issue_buffer(buf)
-      else
-        vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
-          "Failed to get issue details."
-        })
+      -- Fetch
+      local issue_details = fetch_issue(props, issue.id)
+      if not issue_details then
+        set_buffer_text(buf, { "Failed to get issue details." })
+        return
       end
 
-      vim.bo[buf].modifiable = false
-    end,
+      -- Render
+      local lines = _format_issue_details(issue_details)
+      set_buffer_text(buf, lines)
+      highlight_issue_buffer(buf)
+    end
+    ,
     prepare_node = function(node, line, component)
       local type = node.type
 
       if type == 'project' then
         local project = node.project
         line:append(n.text("──", "Comment"))
-        line:append(n.text(string.format(" %s (%d)", project.name, node.count), "Directory"))
+        line:append(n.text(string.format("  %s (%d)", project.name, node.count), "Directory"))
       elseif type == 'issue' then
         local issue = node.issue
         local columns = props.options.ui.columns
@@ -553,7 +571,7 @@ local function _render_tree(props)
           local key = label:lower()
           local emoji = priority_emojis[key] or priority_emojis['default']
           if issue.status.label == 'resolved' or issue.status.label == 'closed' then
-            emoji = "✅"
+            emoji = config.options.priority_emojis.complete
           end
 
           line:append(n.text(string.format("%-" .. columns.priority .. "s ", emoji)))

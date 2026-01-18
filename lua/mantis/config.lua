@@ -81,6 +81,7 @@ M.options = {
     "immediate",
   },
   priority_emojis = {
+    complete = "✅",
     immediate = "🔥",
     urgent    = "⚠️",
     high      = "🔴",
