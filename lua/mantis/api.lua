@@ -184,16 +184,16 @@ function M:get_assigned_issues(page_size, page)
   return self:get_issues({ filter_id = 'assigned', page_size = page_size, page = page })
 end
 
-function M:get_reported_issues()
-  return self:get_issues({ filter_id = 'reported' })
+function M:get_reported_issues(page_size, page)
+  return self:get_issues({ filter_id = 'reported', page_size = page_size, page = page })
 end
 
-function M:get_monitored_issues()
-  return self:get_issues({ filter_id = 'monitored' })
+function M:get_monitored_issues(page_size, page)
+  return self:get_issues({ filter_id = 'monitored', page_size = page_size, page = page })
 end
 
-function M:get_unassigned_issues()
-  return self:get_issues({ filter_id = 'unassigned' })
+function M:get_unassigned_issues(page_size, page)
+  return self:get_issues({ filter_id = 'unassigned', page_size = page_size, page = page })
 end
 
 function M:add_attachments_to_issue(issue_id, data)
