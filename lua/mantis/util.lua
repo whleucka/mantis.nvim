@@ -17,7 +17,7 @@ local timezone_offset = (function()
   return os.difftime(os.time(local_t), os.time(utc_t))
 end)()
 
-function M.parse_iso8601(ts)
+local function parse_iso8601(ts)
   -- strip timezone, assume UTC
   local date, time = ts:match("^(%d+-%d+-%d+)T(%d+:%d+:%d+)")
   if not date or not time then
@@ -38,8 +38,9 @@ function M.parse_iso8601(ts)
   }) + timezone_offset
 end
 
-function M.time_ago(epoch)
-  if not epoch then return "?" end
+function M.time_ago(ts)
+  if not ts then return "?" end
+  local epoch = parse_iso8601(ts)
 
   local diff = os.time() - epoch
 

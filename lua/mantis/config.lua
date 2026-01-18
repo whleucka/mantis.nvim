@@ -3,12 +3,6 @@ local M = {}
 M.options = {
   debug = false,
   hosts = {},
-  selector = {
-    ui = {
-      width = 50,
-      height = 10,
-    }
-  },
   add_note = {
     ui = {
       width = 80,
@@ -22,6 +16,12 @@ M.options = {
     ui = {
       width = 80,
       height = 15,
+    }
+  },
+  view_issue = {
+    ui = {
+      width = 80,
+      height = 30,
     }
   },
   view_issues = {
@@ -79,6 +79,13 @@ M.options = {
     "high",
     "urgent",
     "immediate",
+  },
+  issue_filters = {
+    'all',
+    'assigned',
+    'reported',
+    'monitored',
+    'unassigned',
   },
   priority_emojis = {
     complete = "✅",

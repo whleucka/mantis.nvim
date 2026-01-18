@@ -1,10 +1,11 @@
-vim.api.nvim_create_user_command('Mantis', function()
-  -- Prompt to select host
-  local _, ui = pcall(require, "mantis.ui")
-  if not _ then
-    print("Failed to load Mantis UI")
-  end
-  ui.host_select()
+vim.api.nvim_create_user_command('MantisIssues', function()
+  require("mantis.ui").view_issues()
 end, {
-  desc = 'Open Mantis UI',
+  desc = 'Open Mantis Issues',
+})
+
+vim.api.nvim_create_user_command('MantisSelectHost', function()
+  require("mantis.ui").select_host()
+end, {
+  desc = 'Select Mantis Host',
 })

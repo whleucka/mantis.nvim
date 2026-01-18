@@ -1,22 +1,21 @@
 local M = {}
 
--- local host_config = nil -- Removed module-level host_config
 local config = require('mantis.config')
 local curl = require('plenary.curl')
 
-function M.new(host_name)
-  local instance = {} -- Create instance first
-  instance.host_config = config.options.hosts[host_name] -- Store host_config in instance
-  if not instance.host_config then
-    vim.notify('Mantis: Host "' .. (host_name or 'default') .. '" not configured.', vim.log.levels.ERROR)
+function M.new(host_config)
+  local instance = {}
+  if not host_config then
+    vim.notify('Mantis: Host "' .. (host_config.url or 'default') .. '" not configured.', vim.log.levels.ERROR)
     return nil
   end
 
-  instance.url = instance.host_config.url
-  instance.token = instance.host_config.token or os.getenv('MANTIS_API_TOKEN')
+  instance.name = host_config.url
+  instance.url = host_config.url
+  instance.token = host_config.token or os.getenv(host_config.env)
 
   if not instance.url or not instance.token then
-    vim.notify('Mantis: URL or token not configured for host "' .. (host_name or 'default') .. '".', vim.log.levels
+    vim.notify('Mantis: URL or token not configured for host "' .. (host_config.url or 'default') .. '".', vim.log.levels
     .ERROR)
     return nil
   end
@@ -25,17 +24,17 @@ function M.new(host_name)
 end
 
 function M:call_api(endpoint, method, data)
-  if self.host_config == nil then
+  if self.url == nil then
     return
   end
 
   method = method or 'GET'
   local headers = {
-    ['Authorization'] = self.host_config.token,
+    ['Authorization'] = self.token,
     ['Content-Type'] = 'application/json',
   }
 
-  local url = self.host_config.url .. '/api/rest/' .. endpoint
+  local url = self.url .. '/api/rest/' .. endpoint
 
   local opts = {
     headers = headers,
@@ -86,7 +85,7 @@ function M:call_api(endpoint, method, data)
         error_message = response.body
       end
     end
-    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR) -- Always notify
+    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR) -- always notify
     return nil
   end
 
@@ -97,7 +96,7 @@ function M:call_api(endpoint, method, data)
   return nil
 end
 
---- Issues
+--- issues
 function M:get_issue(id)
   return self:call_api('issues/' .. id)
 end
@@ -181,15 +180,15 @@ function M:get_all_projects()
   return self:call_api('projects', 'GET')
 end
 
-function M:get_my_assigned_issues(page_size, page)
+function M:get_assigned_issues(page_size, page)
   return self:get_issues({ filter_id = 'assigned', page_size = page_size, page = page })
 end
 
-function M:get_my_reported_issues()
+function M:get_reported_issues()
   return self:get_issues({ filter_id = 'reported' })
 end
 
-function M:get_my_monitored_issues()
+function M:get_monitored_issues()
   return self:get_issues({ filter_id = 'monitored' })
 end
 
