@@ -57,7 +57,18 @@ end
 local function _format_issue_details(issue)
   local lines = {}
 
-  table.insert(lines, string.format("# Issue #%s: %s", issue.id, issue.summary))
+  local function _split_and_insert_lines(lines_table, text, indent)
+    indent = indent or ""
+    if text == nil or text == "" then
+      return
+    end
+    local text_lines = vim.split(text, "\n")
+    for _, line in ipairs(text_lines) do
+      table.insert(lines_table, indent .. line)
+    end
+  end
+
+  table.insert(lines, string.format("Issue #%s: %s", issue.id, issue.summary))
   table.insert(lines, "")
   table.insert(lines, string.format("**Project**: %s", issue.project.name))
   table.insert(lines, string.format("**Category**: %s", issue.category.name))
@@ -71,12 +82,28 @@ local function _format_issue_details(issue)
   table.insert(lines, string.format("**Created**: %s", util.time_ago(util.parse_iso8601(issue.created_at))))
   table.insert(lines, string.format("**Updated**: %s", util.time_ago(util.parse_iso8601(issue.updated_at))))
   table.insert(lines, "")
-  table.insert(lines, "## Description")
-  table.insert(lines, issue.description)
+  table.insert(lines, "Description")
+  table.insert(lines, "")
+  _split_and_insert_lines(lines, issue.description)
   table.insert(lines, "")
 
+  if issue.notes and #issue.notes > 0 then
+    table.insert(lines, "Notes")
+    table.insert(lines, "")
+    for _, note in ipairs(issue.notes) do
+      local user = note.reporter.real_name or note.reporter.name
+      local t = util.time_ago(util.parse_iso8601(note.created_at))
+      table.insert(lines, string.format("[%s] **%s**:", t, user))
+      _split_and_insert_lines(lines, note.text, "")
+      table.insert(lines, "")
+    end
+    table.insert(lines, "")
+    table.insert(lines, "")
+  end
+
   if issue.custom_fields and #issue.custom_fields > 0 then
-    table.insert(lines, "## Custom Fields")
+    table.insert(lines, "Custom Fields")
+    table.insert(lines, "")
     for _, field in ipairs(issue.custom_fields) do
       table.insert(lines, string.format("- **%s**: %s", field.field.name, field.value))
     end
@@ -84,11 +111,12 @@ local function _format_issue_details(issue)
   end
 
   if issue.history and #issue.history > 0 then
-    table.insert(lines, "## History")
+    table.insert(lines, "History")
+    table.insert(lines, "")
     for _, item in ipairs(issue.history) do
         local user = item.user.real_name or item.user.name
         local t = util.time_ago(util.parse_iso8601(item.created_at))
-        table.insert(lines, string.format("- [%s] **%s**: %s", t, user, item.message))
+        _split_and_insert_lines(lines, string.format("- [%s] **%s**: %s", t, user, item.message))
     end
     table.insert(lines, "")
   end
@@ -399,10 +427,12 @@ local function _render_tree(props)
           col = col,
           border = "single",
           zindex = 150,
+          title = "Issue #" .. issue.id,
         }
 
         -- 3. Open window
         local win = vim.api.nvim_open_win(buf, true, win_config)
+        vim.wo[win].wrap = true
 
         -- 4. Set keymap
         vim.keymap.set("n", "q", function()
@@ -415,6 +445,37 @@ local function _render_tree(props)
           local issue_details = res.issues[1]
           local lines = _format_issue_details(issue_details)
           vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+          -- Apply highlights
+          vim.wo[win].conceallevel = 2
+          vim.wo[win].concealcursor = "n"
+          local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+          for i, line in ipairs(lines) do
+            local line_idx = i - 1
+
+            -- Highlight Title (first line)
+            if line_idx == 0 then
+              vim.api.nvim_buf_add_highlight(buf, -1, "Title", line_idx, 0, -1)
+            end
+
+            -- Highlight Section Headings
+            if line == "Description" or line == "Notes" or line == "Custom Fields" or line == "History" then
+              vim.api.nvim_buf_add_highlight(buf, -1, "Title", line_idx, 0, -1)
+            end
+
+            -- Bold
+            local start_pos = 1
+            while true do
+              local s, e = line:find("%*%*([^*]+)%*%*", start_pos)
+              if not s then break end
+              -- Highlight the text inside **...** as bold (using 'Bold' group)
+              vim.api.nvim_buf_add_highlight(buf, -1, "Bold", line_idx, s + 1, e - 2)
+              -- Conceal the asterisks
+              vim.api.nvim_buf_add_highlight(buf, -1, "Conceal", line_idx, s - 1, s + 1)
+              vim.api.nvim_buf_add_highlight(buf, -1, "Conceal", line_idx, e - 2, e)
+              start_pos = e + 1
+            end
+          end
         else
           vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Failed to get issue details." })
         end
