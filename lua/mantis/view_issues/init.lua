@@ -54,10 +54,19 @@ local issue_table = n.tree({
   on_change = function(node, component)
     local keymap = options.keymap
     if node.type == 'issue' then
-      signal.selected = node.issue
+      local issue = node.issue
+      signal.selected = issue
+      -- quit
+      vim.keymap.set("n", keymap.quit, function()
+        renderer:close()
+      end, { buffer = true })
+      -- refresh
+      vim.keymap.set("n", keymap.refresh, function()
+        load_issues()
+        refresh(component)
+      end, { buffer = true })
       -- change status
       vim.keymap.set("n", keymap.change_status, function()
-        local issue = signal.selected:get_value()
         vim.ui.select(config.options.issue_status_options, {
           prompt = "Select a status",
         }, function(choice)
@@ -66,6 +75,46 @@ local issue_table = n.tree({
           end
           local res = state.api:update_issue(issue.id, {
             status = {
+              name = choice
+            }
+          })
+          if res and #res.issues > 0 then
+            local updated_issue = res.issues[1]
+            node.issue = updated_issue
+            refresh(component)
+          end
+        end)
+      end, { buffer = true })
+      -- change priority
+      vim.keymap.set("n", keymap.change_priority, function()
+        vim.ui.select(config.options.issue_priority_options, {
+          prompt = "Select a priority",
+        }, function(choice)
+          if not choice then
+            return
+          end
+          local res = state.api:update_issue(issue.id, {
+            priority = {
+              name = choice
+            }
+          })
+          if res and #res.issues > 0 then
+            local updated_issue = res.issues[1]
+            node.issue = updated_issue
+            refresh(component)
+          end
+        end)
+      end, { buffer = true })
+      -- change severity
+      vim.keymap.set("n", keymap.change_severity, function()
+        vim.ui.select(config.options.issue_severity_options, {
+          prompt = "Select a severity",
+        }, function(choice)
+          if not choice then
+            return
+          end
+          local res = state.api:update_issue(issue.id, {
+            severity = {
               name = choice
             }
           })
