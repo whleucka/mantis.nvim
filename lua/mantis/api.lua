@@ -1,8 +1,34 @@
+---@class MantisAPI
+---@field get_issue fun(self, id: number): table
+---@field get_issues fun(self, opts_or_page_size?: table|number, page?: number): table
+---@field create_issue fun(self, data: table): table
+---@field update_issue fun(self, id: number, data: table): table
+---@field delete_issue fun(self, id: number): nil
+---@field get_issue_files fun(self, issue_id: number): table
+---@field get_issue_file fun(self, issue_id: number, file_id: number): table
+---@field get_project_issues fun(self, project_id: number): table
+---@field get_project_users fun(self, project_id: number): table
+---@field get_filtered_issues fun(self, filter_id: string|number): table
+---@field get_all_issues fun(self): table
+---@field get_all_projects fun(self): table
+---@field get_assigned_issues fun(self, page_size?: number, page?: number): table
+---@field get_reported_issues fun(self, page_size?: number, page?: number): table
+---@field get_monitored_issues fun(self, page_size?: number, page?: number): table
+---@field get_unassigned_issues fun(self, page_size?: number, page?: number): table
+---@field add_attachments_to_issue fun(self, issue_id: number, data: table): table
+---@field create_issue_note fun(self, issue_id: number, data: table): table
+---@field delete_issue_note fun(self, issue_id: number, note_id: number): nil
+---@field monitor_issue fun(self, issue_id: number): table
+---@field add_tags_to_issue fun(self, issue_id: number, data: table): table
+---@field remove_tags_from_issue fun(self, issue_id: number, tag_id: number): nil
+---@field add_issue_relationship fun(self, issue_id: number, data: table): table
+
 local M = {}
 
 local config = require('mantis.config')
 local curl = require('plenary.curl')
 
+---@return MantisAPI
 function M.new(host_config)
   local instance = {}
   if not host_config then
