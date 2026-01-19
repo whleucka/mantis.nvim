@@ -44,11 +44,14 @@ M.options = {
       prev_page = "H",
       add_note = "n",
       create_issue = "c",
+      delete_issue = "d",
       open_issue = "o",
       assign_issue = "a",
       change_status = "s",
       change_severity = "v",
       change_priority = "p",
+      change_category = "t",
+      filter = "f",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -57,7 +60,7 @@ M.options = {
   issue_status_options = {},
   issue_severity_options = {},
   issue_priority_options = {},
-  issue_filters = {
+  issue_filter_options = {
     'all',
     'assigned',
     'reported',

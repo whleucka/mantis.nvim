@@ -9,8 +9,8 @@ local function set_host(host)
   state.api = api.new(host)
   if state.api then
     -- load the mantis statuses, severities, priorities ... 
-    local config_data = state.api:get_config({ "status_enum_string", "severity_enum_string", "priority_enum_string" })
-    if config_data and config_data.configs then
+    local ok, config_data = state.api:get_config({ "status_enum_string", "severity_enum_string", "priority_enum_string" })
+    if ok and config_data and config_data.configs then
       for _, c in ipairs(config_data.configs) do
         if c.option == "status_enum_string" then
           config.options.issue_status_options = helper.parse_enum_table(c.value)

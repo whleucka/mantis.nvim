@@ -7,6 +7,7 @@ local options = config.options.view_issues
 local helper = require("mantis.view_issues.helper")
 
 local signal = n.create_signal({
+  show_help = false,
   selected = nil,
   mode = 'all',
   issue_nodes = {},
@@ -17,11 +18,6 @@ local renderer = n.create_renderer({
   height = options.ui.height,
 })
 
-local function refresh(component)
-  local tree = component:get_tree()
-  tree:render()
-end
-
 local issues_cache = {} -- store the fetched issues
 
 local function build_and_refresh()
@@ -29,18 +25,21 @@ local function build_and_refresh()
 end
 
 local function load_issues()
-  local res = {}
+  local ok, res = false, nil
   local mode = signal.mode:get_value()
   if mode == 'all' then
-    res = state.api:get_issues(options.limit, state.page)
+    ok, res = state.api:get_issues(options.limit, state.page)
   elseif mode == 'monitored' then
-    res = state.api:get_monitored_issues(options.limit, state.page)
+    ok, res = state.api:get_monitored_issues(options.limit, state.page)
   elseif mode == 'assigned' then
-    res = state.api:get_assigned_issues(options.limit, state.page)
+    ok, res = state.api:get_assigned_issues(options.limit, state.page)
   elseif mode == 'unassigned' then
-    res = state.api:get_unassigned_issues(options.limit, state.page)
+    ok, res = state.api:get_unassigned_issues(options.limit, state.page)
+  elseif mode == 'reported' then
+    ok, res = state.api:get_reported_issues(options.limit, state.page)
   end
-  if res and res.issues then
+
+  if ok and res and res.issues then
     issues_cache = res.issues
     build_and_refresh()
   end
@@ -53,16 +52,32 @@ local function update_issue_property(issue_table, property_name, property_option
   end
   local issue = node.issue
 
-  vim.ui.select(property_options, {
+  local options_to_show = property_options
+  local prompt_opts = {
     prompt = "Select a " .. property_name,
-  }, function(choice)
+  }
+
+  if property_name == 'category' then
+    local ok, categories = state.api:get_project_categories(issue.project.id)
+    if not ok then
+      return
+    end
+    options_to_show = categories
+    prompt_opts.format_item = function(item)
+      return item.name
+    end
+  end
+
+  vim.ui.select(options_to_show, prompt_opts, function(choice)
     if not choice then
       return
     end
+
+    local choice_name = (type(choice) == "table") and choice.name or choice
     local data = {}
-    data[property_name] = { name = choice }
-    local res = state.api:update_issue(issue.id, data)
-    if res and #res.issues > 0 then
+    data[property_name] = { name = choice_name }
+    local ok, res = state.api:update_issue(issue.id, data)
+    if ok and res and #res.issues > 0 then
       local updated_issue = res.issues[1]
       node.issue = updated_issue
       -- a full refresh is required to re-sort the issues by updated_at
@@ -77,8 +92,8 @@ local function change_page(direction)
     return
   end
 
-  local res = state.api:get_issues(options.limit, new_page)
-  if res and res.issues and #res.issues > 0 then
+  local ok, res = state.api:get_issues(options.limit, new_page)
+  if ok and res and res.issues and #res.issues > 0 then
     state.page = new_page
     issues_cache = res.issues -- update cache
     build_and_refresh()
@@ -122,6 +137,12 @@ local body = function()
     end,
     on_mount = function(component)
       local keymap = options.keymap
+      component:set_border_text("bottom", " " .. keymap.help .. " help ", "right")
+
+      -- show help
+      vim.keymap.set("n", keymap.help, function()
+        signal.show_help = not signal.show_help:get_value()
+      end, { buffer = true, nowait = true })
       -- refresh
       vim.keymap.set("n", keymap.refresh, function()
         load_issues()
@@ -139,6 +160,81 @@ local body = function()
       vim.keymap.set("n", keymap.change_severity, function()
         update_issue_property(component, 'severity', config.options.issue_severity_options)
       end, { buffer = true, nowait = true })
+      -- change category
+      vim.keymap.set("n", keymap.change_category, function()
+        update_issue_property(component, 'category', config.options.issue_category_options)
+      end, { buffer = true, nowait = true })
+      -- assign issue
+      vim.keymap.set("n", keymap.assign_issue, function()
+        vim.schedule(function()
+          local node = component:get_tree():get_node()
+          if not (node and node.type == 'issue') then
+            return
+          end
+          local issue = node.issue
+
+          local ok, users_data = state.api:get_project_users(issue.project.id)
+          if not ok then
+            return
+          end
+
+          vim.ui.select(users_data.users, {
+            prompt = "Select a user to assign",
+            format_item = function(item)
+              return item.name
+            end,
+          }, function(choice)
+            if not choice then
+              return
+            end
+
+            local data = {
+              handler = { name = choice.name }
+            }
+            local ok, res = state.api:update_issue(issue.id, data)
+            if ok and res and #res.issues > 0 then
+              local updated_issue = res.issues[1]
+              node.issue = updated_issue
+              load_issues()
+            end
+          end)
+        end)
+      end, { buffer = true, nowait = true })
+      -- filter
+      vim.keymap.set("n", keymap.filter, function()
+        vim.ui.select(config.options.issue_filter_options, {
+          prompt = "Select an issue filter",
+        }, function(choice)
+          if not choice then
+            return
+          end
+
+          signal.mode = choice
+          load_issues()
+        end)
+      end, { buffer = true, nowait = true })
+      -- delete issue
+      vim.keymap.set("n", keymap.delete_issue, function()
+        local issue = signal.selected:get_value()
+        if not issue then
+          vim.notify('No issue selected.', vim.log.levels.ERROR)
+          return
+        end
+
+        vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue.id .. '? (y/n)', default = 'n' }, function(input)
+          if input and input:lower() == 'y' then
+            local ok, _ = state.api:delete_issue(issue.id)
+            if ok then
+              vim.notify('Issue #' .. issue.id .. ' deleted.', vim.log.levels.INFO)
+              load_issues() -- Refresh the issue list
+            else
+              vim.notify('Failed to delete issue #' .. issue.id, vim.log.levels.ERROR)
+            end
+          else
+            vim.notify('Deletion cancelled.', vim.log.levels.INFO)
+          end
+        end)
+      end, { buffer = true, nowait = true })
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()
         change_page(-1)
@@ -153,7 +249,14 @@ local body = function()
       end, { buffer = true, nowait = true })
     end,
   })
-  return n.rows(issue_table)
+
+  local help = n.paragraph({
+    hidden = signal.show_help:negate(),
+    lines = helper.get_help(),
+    align = "center"
+  })
+
+  return n.rows(issue_table, help)
 end
 
 -- initial load

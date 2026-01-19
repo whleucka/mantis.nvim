@@ -52,7 +52,7 @@ end
 
 function M:call_api(endpoint, method, data)
   if self.url == nil then
-    return
+    return false, "URL not configured"
   end
 
   method = method or 'GET'
@@ -81,18 +81,23 @@ function M:call_api(endpoint, method, data)
     end
   end
 
-  local response
-  if method == 'GET' then
-    response = curl.get(url, opts)
-  elseif method == 'POST' then
-    response = curl.post(url, opts)
-  elseif method == 'PATCH' then
-    response = curl.patch(url, opts)
-  elseif method == 'DELETE' then
-    response = curl.delete(url, opts)
-  else
-    vim.notify('Mantis API Error: Unsupported method ' .. method, vim.log.levels.ERROR)
-    return nil
+  local ok, response = pcall(function()
+    if method == 'GET' then
+      return curl.get(url, opts)
+    elseif method == 'POST' then
+      return curl.post(url, opts)
+    elseif method == 'PATCH' then
+      return curl.patch(url, opts)
+    elseif method == 'DELETE' then
+      return curl.delete(url, opts)
+    else
+      return nil, "Unsupported method " .. method
+    end
+  end)
+
+  if not ok then
+    vim.notify('Mantis API Error: ' .. tostring(response), vim.log.levels.ERROR)
+    return false, response
   end
 
   if config.options.debug then
@@ -104,23 +109,28 @@ function M:call_api(endpoint, method, data)
   if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
     local error_message = "Mantis API Error"
     if response.body and response.body ~= "" then
-      local ok, decoded = pcall(vim.fn.json_decode, response.body)
-
-      if ok and type(decoded) == "table" and decoded.message then
+      local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
+      if decode_ok and type(decoded) == "table" and decoded.message then
         error_message = decoded.message
       else
         error_message = response.body
       end
     end
-    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR) -- always notify
-    return nil
+    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
+    return false, error_message
   end
 
   if response.body and response.body ~= '' then
-    return vim.fn.json_decode(response.body)
+    local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
+    if decode_ok then
+      return true, decoded
+    else
+      vim.notify('Mantis API Error: Failed to decode response body.', vim.log.levels.ERROR)
+      return false, "Failed to decode response"
+    end
   end
 
-  return nil
+  return true, nil
 end
 
 function M:get_config(options)
@@ -208,6 +218,14 @@ end
 
 function M:get_project_users(project_id)
   return self:call_api('projects/' .. project_id .. '/users', 'GET')
+end
+
+function M:get_project_categories(project_id)
+  local ok, project = self:call_api('projects/' .. project_id, 'GET')
+  if ok and project and project.projects and project.projects[1] then
+    return true, project.projects[1].categories
+  end
+  return false, {}
 end
 
 function M:get_filtered_issues(filter_id)
