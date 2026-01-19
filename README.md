@@ -50,7 +50,7 @@ require('mantis').setup({
 })
 ```
 
-## Default configuration
+### Default configuration
 
 ```lua
 {
