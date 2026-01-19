@@ -8,7 +8,7 @@ This plugin relies on the following external dependencies:
 
 *   [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
 *   [MunifTanjim/nui.nvim](https://github.com/MunifTanjim/nui.nvim)
-*   [MunifTanjim/nui-components.nvim](https://github.com/MunifTanjim/nui-components.nvim)
+*   [grapp-dev/nui-components.nvim](https://github.com/grapp-dev/nui-components.nvim)
 
 You can install `mantis-nvim` and its dependencies using your preferred plugin manager.
 
