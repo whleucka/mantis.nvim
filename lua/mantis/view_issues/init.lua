@@ -138,7 +138,12 @@ local body = function()
     on_mount = function(component)
       local keymap = options.keymap
       component:set_border_text("bottom", " " .. keymap.help .. " help ", "right")
-
+      -- open issue in browser
+      vim.keymap.set("n", keymap.open_issue, function()
+        local issue = signal.selected:get_value()
+        local url = string.format("%s/view.php?id=%d", state.api.url, issue.id)
+        vim.system({ 'xdg-open', url }, { detach = true })
+      end, { buffer = true, nowait = true })
       -- show help
       vim.keymap.set("n", keymap.help, function()
         signal.show_help = not signal.show_help:get_value()
