@@ -122,10 +122,6 @@ local body = function()
     end,
     on_mount = function(component)
       local keymap = options.keymap
-      -- quit
-      vim.keymap.set("n", keymap.quit, function()
-        renderer:close()
-      end, { buffer = true, nowait = true })
       -- refresh
       vim.keymap.set("n", keymap.refresh, function()
         load_issues()
@@ -150,6 +146,10 @@ local body = function()
       -- next_page
       vim.keymap.set("n", keymap.next_page, function()
         change_page(1)
+      end, { buffer = true, nowait = true })
+      -- quit
+      vim.keymap.set({ "n", "i" }, keymap.quit, function()
+        renderer:close()
       end, { buffer = true, nowait = true })
     end,
   })
