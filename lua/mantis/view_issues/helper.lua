@@ -1,5 +1,6 @@
 local M = {}
 
+local state = require("mantis.state")
 local n = require("nui-components")
 local util = require("mantis.util")
 local config = require("mantis.config")
@@ -75,7 +76,7 @@ function M.prepare_node(node, line, component)
         end
 
         if columns.updated then
-          local updated_text = util.time_ago(issue.updated_at)
+          local updated_text = M.time_ago(issue.updated_at)
           local updated = n.text(
             string.format("%" .. columns.updated .. "s", util.truncate(updated_text, columns.updated)), "Comment")
           line:append(updated)
@@ -120,17 +121,78 @@ function M.build_nodes(issues)
       count = #entry.issues,
     }
     table.insert(nodes, n.node(node))
-    for i, issue in ipairs(entry.issues) do
-      local _issue = {
-        index = i,
-        count = #entry.issues,
-        type = 'issue',
-        issue = issue,
-      }
-      table.insert(nodes, n.node(_issue))
+
+    local project_id = entry.project.id
+    local collapsed = false
+    for _, id in ipairs(state.collapsed_projects) do
+      if id == project_id then
+        collapsed = true
+        break
+      end
+    end
+
+    if not collapsed then
+      for i, issue in ipairs(entry.issues) do
+        local _issue = {
+          index = i,
+          count = #entry.issues,
+          type = 'issue',
+          issue = issue,
+        }
+        table.insert(nodes, n.node(_issue))
+      end
     end
   end
 
   return nodes
 end
+
+local timezone_offset = (function()
+  local now = os.time()
+  local local_t = os.date("*t", now)
+  local utc_t = os.date("!*t", now)
+  local_t.isdst = false
+  return os.difftime(os.time(local_t), os.time(utc_t))
+end)()
+
+local function parse_iso8601(ts)
+  -- strip timezone, assume UTC
+  local date, time = ts:match("^(%d+-%d+-%d+)T(%d+:%d+:%d+)")
+  if not date or not time then
+    return nil
+  end
+
+  local y, m, d = date:match("(%d+)-(%d+)-(%d+)")
+  local hh, mm, ss = time:match("(%d+):(%d+):(%d+)")
+
+  return os.time({
+    year  = tonumber(y),
+    month = tonumber(m),
+    day   = tonumber(d),
+    hour  = tonumber(hh),
+    min   = tonumber(mm),
+    sec   = tonumber(ss),
+    isdst = false,
+  }) + timezone_offset
+end
+
+function M.time_ago(ts)
+  if not ts then return "?" end
+  local epoch = parse_iso8601(ts)
+
+  local diff = os.time() - epoch
+
+  if diff < 60 then
+    return diff .. "s ago"
+  elseif diff < 3600 then
+    return math.floor(diff / 60) .. "m ago"
+  elseif diff < 86400 then
+    return math.floor(diff / 3600) .. "h ago"
+  elseif diff < 604800 then
+    return math.floor(diff / 86400) .. "d ago"
+  else
+    return math.floor(diff / 604800) .. "w ago"
+  end
+end
+
 return M

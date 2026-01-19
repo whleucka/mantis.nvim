@@ -22,6 +22,7 @@
 ---@field add_tags_to_issue fun(self, issue_id: number, data: table): table
 ---@field remove_tags_from_issue fun(self, issue_id: number, tag_id: number): nil
 ---@field add_issue_relationship fun(self, issue_id: number, data: table): table
+---@field get_config fun(self, options: table): table
 
 local M = {}
 
@@ -120,6 +121,21 @@ function M:call_api(endpoint, method, data)
   end
 
   return nil
+end
+
+function M:get_config(options)
+  local query_params = {}
+
+  for _, option in ipairs(options) do
+    table.insert(query_params, 'option[]=' .. option)
+  end
+
+  local query_string = table.concat(query_params, '&')
+  local endpoint = 'config'
+  if query_string ~= '' then
+    endpoint = endpoint .. '?' .. query_string
+  end
+  return self:call_api(endpoint)
 end
 
 --- issues
