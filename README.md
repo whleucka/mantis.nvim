@@ -16,11 +16,11 @@ You can install `mantis-nvim` and its dependencies using your preferred plugin m
 
 ```lua
 use {
-  'your-github-username/mantis-nvim', -- Replace with the actual repository
+  'whleucka/mantis-nvim',
   requires = {
     'nvim-lua/plenary.nvim',
     'MunifTanjim/nui.nvim',
-    'MunifTanjim/nui-components.nvim',
+    'grapp-dev/nui-components.nvim',
   },
 }
 ```
@@ -41,7 +41,7 @@ require('mantis').setup({
     },
     {
       name = "Another MantisBT Instance",
-      url = "https://another.mantishub.com/api/rest",
+      url = "https://another.mantis-host.com",
       env = "MANTIS_API_TOKEN", -- Use this to read the token from an environment variable
     },
   },
