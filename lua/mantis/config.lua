@@ -47,6 +47,7 @@ M.options = {
       delete_issue = "d",
       open_issue = "o",
       assign_issue = "a",
+      change_summary = "S",
       change_status = "s",
       change_severity = "v",
       change_priority = "p",

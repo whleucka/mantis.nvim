@@ -28,6 +28,7 @@ function M.get_help()
         { key = "create_issue",    label = "Create issue" },
         { key = "delete_issue",    label = "Delete issue" },
         { key = "assign_issue",    label = "Assign issue" },
+        { key = "change_summary",   label = "Change summary" },
         { key = "change_status",   label = "Change status" },
         { key = "change_severity", label = "Change severity" },
         { key = "change_priority", label = "Change priority" },

@@ -160,6 +160,31 @@ local body = function()
       vim.keymap.set("n", keymap.change_severity, function()
         update_issue_property(component, 'severity', config.options.issue_severity_options)
       end, { buffer = true, nowait = true })
+      -- change summary
+      vim.keymap.set("n", keymap.change_summary, function()
+        vim.schedule(function()
+          local node = component:get_tree():get_node()
+          if not (node and node.type == 'issue') then
+            return
+          end
+          local issue = node.issue
+
+          local new_summary = vim.fn.input("New summary: ", issue.summary)
+          if not new_summary or new_summary == "" then
+            return
+          end
+
+          local data = {
+            summary = new_summary
+          }
+          local ok, res = state.api:update_issue(issue.id, data)
+          if ok and res and #res.issues > 0 then
+            local updated_issue = res.issues[1]
+            node.issue = updated_issue
+            load_issues()
+          end
+        end)
+      end, { buffer = true, nowait = true })
       -- change category
       vim.keymap.set("n", keymap.change_category, function()
         update_issue_property(component, 'category', config.options.issue_category_options)
