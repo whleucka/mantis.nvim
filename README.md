@@ -1,6 +1,7 @@
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/3b2f8a9c-2810-4ec3-acd6-145bea3d1bdc" />
 
-[MantisBT](https://mantisbt.org) plugin for Neovim.
+**WIP**:[MantisBT](https://mantisbt.org) plugin for Neovim.
+
 
 <img width="1397" height="992" alt="image" src="https://github.com/user-attachments/assets/b7c0eb61-ce81-488e-ab03-c6cb4704c043" />
 
@@ -134,5 +135,3 @@ require('mantis').setup({
   },
 }
 ```
-
-(This section will be expanded later)
