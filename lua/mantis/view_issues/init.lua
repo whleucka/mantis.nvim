@@ -261,7 +261,7 @@ local body = function()
           return
         end
 
-        vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue.id .. '? (y/n)', default = 'n' },
+        vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue.id .. '? (y/n) ', default = 'n' },
           function(input)
             if input and input:lower() == 'y' then
               local ok, _ = state.api:delete_issue(issue.id)

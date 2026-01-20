@@ -17,8 +17,8 @@ function M.render(issue_id)
     border = {
       style = "rounded",
       text = {
-        top = "Add Note to Issue #" .. issue_id,
-        top_align = "center",
+        top = " Add Note to Issue #" .. issue_id .. " ",
+        top_align = "left",
       },
     },
     position = "50%",
@@ -27,6 +27,7 @@ function M.render(issue_id)
       height = popup_height,
     },
     zindex = 200,
+    win_options = { wrap = true },
   })
 
   -- mount/unmount logic
@@ -50,7 +51,7 @@ function M.render(issue_id)
         return
       end
 
-      vim.ui.input({ prompt = "Track time? (HH:MM) (y/n)", default = "n" }, function(input)
+      vim.ui.input({ prompt = "Track time? (HH:MM) (y/n) ", default = "n" }, function(input)
         if not input or input:lower() == "n" then
           local data = {
             text = note_text,
@@ -66,7 +67,7 @@ function M.render(issue_id)
         end
 
         if input:lower() == "y" then
-          vim.ui.input({ prompt = "Enter time (HH:MM)" }, function(time_input)
+          vim.ui.input({ prompt = "Enter time (HH:MM) " }, function(time_input)
             if not time_input then
               return
             end
@@ -120,7 +121,7 @@ function M.render(issue_id)
         return
       end
 
-      vim.ui.input({ prompt = "Track time? (HH:MM) (y/n)", default = "n" }, function(input)
+      vim.ui.input({ prompt = "Track time? (HH:MM) (y/n) ", default = "n" }, function(input)
         if not input or input:lower() == "n" then
           local data = {
             text = note_text,
@@ -136,7 +137,7 @@ function M.render(issue_id)
         end
 
         if input:lower() == "y" then
-          vim.ui.input({ prompt = "Enter time (HH:MM)" }, function(time_input)
+          vim.ui.input({ prompt = "Enter time (HH:MM) " }, function(time_input)
             if not time_input then
               return
             end
