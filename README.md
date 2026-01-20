@@ -152,6 +152,7 @@ require('mantis').setup({
   issue_status_options = {},
   issue_severity_options = {},
   issue_priority_options = {},
+  issue_resolution_options = {},
   issue_filter_options = {
     'all',
     'assigned',
@@ -163,8 +164,8 @@ require('mantis').setup({
     complete = "✅",
     immediate = "🔥",
     urgent    = "‼️",
-    high      = "🔺",
-    normal    = "🟦",
+    high      = "❗",
+    normal    = "⭐",
     low       = "🔻",
     default   = "❓"
   },
