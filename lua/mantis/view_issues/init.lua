@@ -56,6 +56,9 @@ local function update_issue_property(issue_table, property_name, property_option
   local options_to_show = property_options
   local prompt_opts = {
     prompt = "Select a " .. property_name,
+    format_item = function(item)
+      return item.name
+    end,
   }
 
   if property_name == 'category' then
@@ -75,7 +78,7 @@ local function update_issue_property(issue_table, property_name, property_option
     end
 
     local choice_name = (type(choice) == "table") and choice.name or choice
-    local data = {} 
+    local data = {}
     data[property_name] = { name = choice_name }
 
     local function update_issue(issue_id, issue_data)
@@ -88,13 +91,13 @@ local function update_issue_property(issue_table, property_name, property_option
       end
     end
 
-    if property_name == 'status' and (choice == 'resolved' or choice == 'closed') then
+    if property_name == 'status' and (choice.name == 'resolved' or choice.name == 'closed') then
       vim.ui.select(config.options.issue_resolution_options, {
         prompt = "Select a resolution",
         format_item = function(item)
           return item.name
         end,
-      }, function(resolution_choice) 
+      }, function(resolution_choice)
         if not resolution_choice then
           return
         end
