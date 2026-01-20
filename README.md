@@ -6,20 +6,32 @@
 
 ## Features
 
-View Issues
-- configurable properties
-- paginated responses (optional)
-- assign issue to user
-- create new issue
-- delete issue
-- open issue in browser
-- change status, priority, severity, category
-- add issue note
+- Supports multiple MantisBT hosts
+- Fully reactive UI powered by **nui-components**
+- Fast. Like, *why-is-this-Lua-so-fast* fast ⚡
 
-View Issue
-- view issue details
-- view issue notes
-- view issue history
+### Issues
+
+- Configurable issue properties
+- Optional pagination for large result sets
+- Assign issues to users
+- Create and delete issues
+- Open issues directly in your browser
+- Update status, priority, severity, and category
+- Add notes to existing issues
+
+### Create Issue
+
+- Assign users
+- Set category
+- Add summary and description
+
+### View Issue
+
+- Inspect full issue details
+- Browse issue notes
+- Review issue history
+
 
 ## Installation
 
@@ -79,21 +91,32 @@ require('mantis').setup({
       width = 80,
       height = 15,
     },
+    keymap = {
+      quit = "q",
+      submit = "<C-CR>",
+    }
   },
   create_issue = {
     ui = {
       width = 80,
       height = 15,
+    },
+    keymap = {
+      quit = "q",
+      submit = "<C-CR>",
     }
   },
   view_issue = {
     ui = {
       width = 80,
       height = 30,
+    },
+    keymap = {
+      quit = "q",
     }
   },
   view_issues = {
-    limit = 42,
+    limit = 40,
     ui = {
       width = 150,
       height = 50,
@@ -110,16 +133,16 @@ require('mantis').setup({
     keymap = {
       next_page = "L",
       prev_page = "H",
-      add_note = "n",
-      create_issue = "c",
-      delete_issue = "d",
+      add_note = "N",
+      create_issue = "C",
+      delete_issue = "D",
       open_issue = "o",
       assign_issue = "a",
       change_summary = "S",
       change_status = "s",
       change_severity = "v",
       change_priority = "p",
-      change_category = "t",
+      change_category = "c",
       filter = "f",
       help = "?",
       refresh = "r",
@@ -139,11 +162,11 @@ require('mantis').setup({
   priority_emojis = {
     complete = "✅",
     immediate = "🔥",
-    urgent    = "⚠️",
-    high      = "🔴",
-    normal    = "🟢",
-    low       = "🔵",
-    default   = "⚪"
+    urgent    = "‼️",
+    high      = "🔺",
+    normal    = "🟦",
+    low       = "🔻",
+    default   = "❓"
   },
 }
 ```
