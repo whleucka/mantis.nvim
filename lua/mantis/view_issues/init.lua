@@ -1,5 +1,6 @@
 local M = {}
 
+local ui = require("mantis.ui")
 local n = require("nui-components")
 local state = require("mantis.state")
 local config = require("mantis.config")
@@ -138,6 +139,11 @@ local body = function()
     on_mount = function(component)
       local keymap = options.keymap
       component:set_border_text("bottom", " " .. keymap.help .. " help ", "right")
+      -- add issue note
+      vim.keymap.set("n", keymap.add_note, function()
+        local issue = signal.selected:get_value()
+        ui.add_note(issue.id)
+      end, { buffer = true, nowait = true })
       -- open issue in browser
       vim.keymap.set("n", keymap.open_issue, function()
         local issue = signal.selected:get_value()
@@ -251,19 +257,20 @@ local body = function()
           return
         end
 
-        vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue.id .. '? (y/n)', default = 'n' }, function(input)
-          if input and input:lower() == 'y' then
-            local ok, _ = state.api:delete_issue(issue.id)
-            if ok then
-              vim.notify('Issue #' .. issue.id .. ' deleted.', vim.log.levels.INFO)
-              load_issues() -- Refresh the issue list
+        vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue.id .. '? (y/n)', default = 'n' },
+          function(input)
+            if input and input:lower() == 'y' then
+              local ok, _ = state.api:delete_issue(issue.id)
+              if ok then
+                vim.notify('Issue #' .. issue.id .. ' deleted.', vim.log.levels.INFO)
+                load_issues() -- Refresh the issue list
+              else
+                vim.notify('Failed to delete issue #' .. issue.id, vim.log.levels.ERROR)
+              end
             else
-              vim.notify('Failed to delete issue #' .. issue.id, vim.log.levels.ERROR)
+              vim.notify('Deletion cancelled.', vim.log.levels.INFO)
             end
-          else
-            vim.notify('Deletion cancelled.', vim.log.levels.INFO)
-          end
-        end)
+          end)
       end, { buffer = true, nowait = true })
       -- prev page
       vim.keymap.set("n", keymap.prev_page, function()

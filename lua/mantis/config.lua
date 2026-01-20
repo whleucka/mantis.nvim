@@ -9,6 +9,7 @@ M.options = {
       height = 15,
     },
     keymap = {
+      submit = "<C-Enter>",
       toggle_time = "<C-t>",
     }
   },

@@ -22,6 +22,16 @@ function M.select_host()
   mod.render()
 end
 
+-- add issue note
+function M.add_note(issue_id)
+  local ok, mod =  pcall(require, "mantis.add_note")
+  if not ok then
+    vim.notify("Failed to load mantis.add_note", vim.log.levels.ERROR)
+    return
+  end
+  mod.render(issue_id)
+end
+
 -- check if api is read
 if not state.api then
   M.select_host()
