@@ -1,9 +1,25 @@
 <img width="100%" alt="image" src="https://github.com/user-attachments/assets/3b2f8a9c-2810-4ec3-acd6-145bea3d1bdc" />
 
-**WIP**:[MantisBT](https://mantisbt.org) plugin for Neovim.
-
+[MantisBT](https://mantisbt.org) plugin for Neovim.
 
 <img width="1397" height="992" alt="image" src="https://github.com/user-attachments/assets/b7c0eb61-ce81-488e-ab03-c6cb4704c043" />
+
+## Features
+
+View Issues
+- configurable properties
+- paginated responses (optional)
+- assign issue to user
+- create new issue
+- delete issue
+- open issue in browser
+- change status, priority, severity, category
+- add issue note
+
+View Issue
+- view issue details
+- view issue notes
+- view issue history
 
 ## Installation
 
@@ -49,7 +65,6 @@ require('mantis').setup({
     },
   },
   -- Other optional configurations
-  debug = false,
 })
 ```
 
@@ -64,9 +79,6 @@ require('mantis').setup({
       width = 80,
       height = 15,
     },
-    keymap = {
-      toggle_time = "<C-t>",
-    }
   },
   create_issue = {
     ui = {

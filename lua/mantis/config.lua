@@ -9,8 +9,8 @@ M.options = {
       height = 15,
     },
     keymap = {
+      quit = "q",
       submit = "<C-Enter>",
-      toggle_time = "<C-t>",
     }
   },
   create_issue = {
