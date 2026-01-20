@@ -2,8 +2,6 @@
 
 [MantisBT](https://mantisbt.org) plugin for Neovim.
 
-<img width="1449" height="991" alt="image" src="https://github.com/user-attachments/assets/8c30bbfd-1590-4dd4-9763-d05b30eb96a3" />
-
 ## Features
 
 - Supports multiple MantisBT hosts
@@ -171,3 +169,7 @@ require('mantis').setup({
   },
 }
 ```
+
+## Screenshots
+
+<img width="1449" height="991" alt="image" src="https://github.com/user-attachments/assets/8c30bbfd-1590-4dd4-9763-d05b30eb96a3" />
