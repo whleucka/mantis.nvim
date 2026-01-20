@@ -2,7 +2,7 @@
 
 [MantisBT](https://mantisbt.org) plugin for Neovim.
 
-<img width="1397" height="992" alt="image" src="https://github.com/user-attachments/assets/b7c0eb61-ce81-488e-ab03-c6cb4704c043" />
+<img width="1449" height="991" alt="image" src="https://github.com/user-attachments/assets/8c30bbfd-1590-4dd4-9763-d05b30eb96a3" />
 
 ## Features
 
