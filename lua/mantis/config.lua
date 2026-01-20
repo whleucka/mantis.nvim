@@ -81,8 +81,8 @@ M.options = {
     complete = "✅",
     immediate = "🔥",
     urgent    = "‼️",
-    high      = "🔺",
-    normal    = "🟦",
+    high      = "❗",
+    normal    = "⭐",
     low       = "🔻",
     default   = "❓"
   },
