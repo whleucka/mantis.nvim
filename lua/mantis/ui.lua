@@ -42,6 +42,16 @@ function M.view_issue(issue_id)
   mod.render(issue_id)
 end
 
+-- create issue
+function M.create_issue(project_id)
+  local ok, mod = pcall(require, "mantis.create_issue")
+  if not ok then
+    vim.notify("Failed to load mantis.create_issue: " .. mod, vim.log.levels.ERROR)
+    return
+  end
+  mod.render(project_id)
+end
+
 -- check if api is read
 if not state.api then
   M.select_host()

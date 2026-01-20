@@ -3,11 +3,11 @@ local M = {}
 local Popup = require("nui.popup")
 local event = require("nui.utils.autocmd").event
 local config = require("mantis.config")
+local options = config.options.add_note
 local state = require("mantis.state")
 local helper = require("mantis.add_note.helper")
 
 function M.render(issue_id)
-  local options = config.options.add_note
   local popup_width = options.ui.width
   local popup_height = options.ui.height
 
@@ -17,7 +17,7 @@ function M.render(issue_id)
     border = {
       style = "rounded",
       text = {
-        top = " Add Note to Issue #" .. issue_id .. " ",
+        top = "Add Note to Issue #" .. issue_id,
         top_align = "left",
       },
     },

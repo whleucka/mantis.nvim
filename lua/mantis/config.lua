@@ -10,23 +10,30 @@ M.options = {
     },
     keymap = {
       quit = "q",
-      submit = "<C-Enter>",
+      submit = "<C-CR>",
     }
   },
   create_issue = {
     ui = {
       width = 80,
       height = 15,
+    },
+    keymap = {
+      quit = "q",
+      submit = "<C-CR>",
     }
   },
   view_issue = {
     ui = {
       width = 80,
       height = 30,
+    },
+    keymap = {
+      quit = "q",
     }
   },
   view_issues = {
-    limit = 42,
+    limit = 40,
     ui = {
       width = 150,
       height = 50,
@@ -72,11 +79,11 @@ M.options = {
   priority_emojis = {
     complete = "✅",
     immediate = "🔥",
-    urgent    = "⚠️",
-    high      = "🔴",
-    normal    = "🟢",
-    low       = "🔵",
-    default   = "⚪"
+    urgent    = "‼️",
+    high      = "🔺",
+    normal    = "🟦",
+    low       = "🔻",
+    default   = "❓"
   },
 }
 

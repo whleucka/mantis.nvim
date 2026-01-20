@@ -8,6 +8,7 @@
 ---@field get_issue_file fun(self, issue_id: number, file_id: number): table
 ---@field get_project_issues fun(self, project_id: number): table
 ---@field get_project_users fun(self, project_id: number): table
+---@field get_project_categories fun(self, project_id: number): table
 ---@field get_filtered_issues fun(self, filter_id: string|number): table
 ---@field get_all_issues fun(self): table
 ---@field get_all_projects fun(self): table
@@ -37,13 +38,14 @@ function M.new(host_config)
     return nil
   end
 
-  instance.name = host_config.url
+  instance.name = host_config.name
   instance.url = host_config.url
   instance.token = host_config.token or os.getenv(host_config.env)
 
   if not instance.url or not instance.token then
-    vim.notify('Mantis: URL or token not configured for host "' .. (host_config.url or 'default') .. '".', vim.log.levels
-    .ERROR)
+    vim.notify('Mantis: URL or token not configured for host "' .. (host_config.url or 'default') .. '".', vim.log
+      .levels
+      .ERROR)
     return nil
   end
 

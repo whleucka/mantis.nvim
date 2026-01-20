@@ -109,7 +109,7 @@ local body = function()
   issue_table = n.tree({
     flex = 1,
     autofocus = true,
-    border_label = "MantisBT Issues",
+    border_label = "MantisBT Issues [" .. state.api.name .. "]",
     data = signal.issue_nodes,
     on_select = function(node, component)
       if node.type == 'project' then
@@ -127,7 +127,8 @@ local body = function()
         end
         build_and_refresh()
       elseif node.type == 'issue' then
-        -- nothing to do here for now
+        -- view issue
+
       end
     end,
     prepare_node = helper.prepare_node,
@@ -147,6 +148,26 @@ local body = function()
         else
           vim.notify("No issue selected.", vim.log.levels.WARN)
         end
+      end, { buffer = true, nowait = true })
+      -- create issue
+      vim.keymap.set("n", keymap.create_issue, function()
+        local ok, res = state.api:get_all_projects()
+        if not ok or #res.projects == 0 then
+          return
+        end
+        local projects = res.projects
+        vim.ui.select(projects, {
+          prompt = "Select a project",
+          format_item = function(item)
+            return item.name
+          end
+          },
+          function(choice)
+            if not choice then return end
+            ui.create_issue(choice.id)
+            renderer:close()
+          end
+        )
       end, { buffer = true, nowait = true })
       -- open issue in browser
       vim.keymap.set("n", keymap.open_issue, function()
@@ -267,7 +288,7 @@ local body = function()
               local ok, _ = state.api:delete_issue(issue.id)
               if ok then
                 vim.notify('Issue #' .. issue.id .. ' deleted.', vim.log.levels.INFO)
-                load_issues() -- Refresh the issue list
+                load_issues()
               else
                 vim.notify('Failed to delete issue #' .. issue.id, vim.log.levels.ERROR)
               end
