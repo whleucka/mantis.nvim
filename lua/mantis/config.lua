@@ -69,6 +69,17 @@ M.options = {
   issue_status_options = {},
   issue_severity_options = {},
   issue_priority_options = {},
+  issue_resolution_options = {
+    { id = 10, name = 'open' },
+    { id = 20, name = 'fixed' },
+    { id = 30, name = 'reopened' },
+    { id = 40, name = 'unable to reproduce' },
+    { id = 50, name = 'not fixable' },
+    { id = 60, name = 'duplicate' },
+    { id = 70, name = 'no change required' },
+    { id = 80, name = 'suspended' },
+    { id = 90, name = "won't fix" },
+  },
   issue_filter_options = {
     'all',
     'assigned',

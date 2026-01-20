@@ -75,18 +75,37 @@ local function update_issue_property(issue_table, property_name, property_option
     end
 
     local choice_name = (type(choice) == "table") and choice.name or choice
-    local data = {}
+    local data = {} 
     data[property_name] = { name = choice_name }
-    local ok, res = state.api:update_issue(issue.id, data)
-    if ok and res and #res.issues > 0 then
-      local updated_issue = res.issues[1]
-      node.issue = updated_issue
-      -- a full refresh is required to re-sort the issues by updated_at
-      load_issues()
+
+    local function update_issue(issue_id, issue_data)
+      local ok, res = state.api:update_issue(issue_id, issue_data)
+      if ok and res and #res.issues > 0 then
+        local updated_issue = res.issues[1]
+        node.issue = updated_issue
+        -- a full refresh is required to re-sort the issues by updated_at
+        load_issues()
+      end
+    end
+
+    if property_name == 'status' and (choice == 'resolved' or choice == 'closed') then
+      vim.ui.select(config.options.issue_resolution_options, {
+        prompt = "Select a resolution",
+        format_item = function(item)
+          return item.name
+        end,
+      }, function(resolution_choice) 
+        if not resolution_choice then
+          return
+        end
+        data['resolution'] = { id = resolution_choice.id }
+        update_issue(issue.id, data)
+      end)
+    else
+      update_issue(issue.id, data)
     end
   end)
 end
-
 local function change_page(direction)
   local new_page = state.page + direction
   if new_page <= 0 then
