@@ -142,7 +142,11 @@ local body = function()
       -- add issue note
       vim.keymap.set("n", keymap.add_note, function()
         local issue = signal.selected:get_value()
-        ui.add_note(issue.id)
+        if issue and issue.id then
+          ui.add_note(issue.id)
+        else
+          vim.notify("No issue selected.", vim.log.levels.WARN)
+        end
       end, { buffer = true, nowait = true })
       -- open issue in browser
       vim.keymap.set("n", keymap.open_issue, function()

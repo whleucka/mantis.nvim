@@ -1,26 +1,25 @@
 local M = {}
 
-function M.is_valid_time(str)
-  if not str then return true end
-
-  local h, m, s = str:match("^(%d%d):(%d%d):?(%d*)$")
-
-  if not h then
-    return false
+function M.validate_time(time_str)
+  if not time_str then
+    return false, nil
   end
 
-  h, m = tonumber(h), tonumber(m)
-  s = s ~= "" and tonumber(s) or nil
-
-  if h > 23 or m > 59 then
-    return false
+  local hours, minutes
+  if time_str:match("^%d%d:%d%d$") then
+    hours, minutes = time_str:match("^(%d%d):(%d%d)$")
+  else
+    return false, nil
   end
 
-  if s and s > 59 then
-    return false
+  hours = tonumber(hours)
+  minutes = tonumber(minutes)
+
+  if hours > 23 or minutes > 59 then
+    return false, nil
   end
 
-  return true
+  return true, string.format("%02d:%02d", hours, minutes)
 end
 
 return M

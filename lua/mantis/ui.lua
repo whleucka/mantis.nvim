@@ -24,12 +24,12 @@ end
 
 -- add issue note
 function M.add_note(issue_id)
-  local ok, mod =  pcall(require, "mantis.add_note")
+  local ok, mod_or_err = pcall(require, "mantis.add_note")
   if not ok then
-    vim.notify("Failed to load mantis.add_note", vim.log.levels.ERROR)
+    vim.notify("Failed to load mantis.add_note: " .. mod_or_err, vim.log.levels.ERROR)
     return
   end
-  mod.render(issue_id)
+  mod_or_err.render(issue_id)
 end
 
 -- check if api is read
