@@ -33,8 +33,9 @@ M.options = {
     }
   },
   view_issues = {
-    limit = 40,
+    limit = 42, -- issues per page
     ui = {
+      -- column width
       width = 150,
       height = 50,
       columns = {
@@ -80,11 +81,11 @@ M.options = {
   priority_emojis = {
     complete = "✅",
     immediate = "🔥",
-    urgent    = "‼️",
-    high      = "❗",
-    normal    = "⭐",
+    urgent    = "⚠️",
+    high      = "🔺",
     low       = "🔻",
-    default   = "❓"
+    normal    = "🔵",
+    default   = "🟣" -- if no priority is set
   },
 }
 
