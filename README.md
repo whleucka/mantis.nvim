@@ -64,8 +64,8 @@ To use `mantis.nvim`, you need to configure your MantisBT hosts. This is done by
 require('mantis').setup({
   hosts = {
     {
-      name = "My MantisBT Instance",
-      url = "https://mantis.host.com",
+      name = "My MantisBT Instance", -- optional
+      url = "https://mantis.host.com", -- required
       token = "YOUR_API_TOKEN", -- Use this if you want to hardcode the token
     },
     {
