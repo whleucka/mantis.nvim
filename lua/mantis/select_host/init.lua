@@ -39,14 +39,16 @@ function M.render()
 
   -- sort the menu
   table.sort(hosts, function(a, b)
-    return a.name < b.name
+    local a_field = (a.name and a.name) or a.url
+    local b_field = (b.name and b.name) or b.url
+    return a_field < b_field
   end)
 
   -- select a host
   vim.ui.select(hosts, {
     prompt = "Select a MantisBT host",
     format_item = function(item)
-      return item.name
+      return (item.name and item.name) or item.url
     end,
   }, function(choice)
     if not choice then

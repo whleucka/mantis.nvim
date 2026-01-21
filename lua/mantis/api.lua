@@ -1,4 +1,6 @@
 ---@class MantisAPI
+---@field url string
+---@field name string
 ---@field get_issue fun(self, id: number): table
 ---@field get_issues fun(self, opts_or_page_size?: table|number, page?: number): table
 ---@field create_issue fun(self, data: table): table
