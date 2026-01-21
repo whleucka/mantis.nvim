@@ -21,7 +21,7 @@ local renderer = n.create_renderer({
 
 local issues_cache = {} -- store the fetched issues
 
-local function build_and_refresh()
+local function build_signal_nodes()
   signal.issue_nodes = helper.build_nodes(issues_cache)
 end
 
@@ -42,7 +42,7 @@ local function load_issues()
 
   if ok and res and res.issues then
     issues_cache = res.issues
-    build_and_refresh()
+    build_signal_nodes()
   end
 end
 
@@ -109,6 +109,7 @@ local function update_issue_property(issue_table, property_name, property_option
     end
   end)
 end
+
 local function change_page(direction)
   local new_page = state.page + direction
   if new_page <= 0 then
@@ -119,10 +120,15 @@ local function change_page(direction)
   if ok and res and res.issues and #res.issues > 0 then
     state.page = new_page
     issues_cache = res.issues -- update cache
-    build_and_refresh()
+    build_signal_nodes()
   else
     vim.notify("No more issues on the next page.", vim.log.levels.INFO)
   end
+end
+
+local function refresh_nodes(component)
+  local tree = component:get_tree()
+  tree:render()
 end
 
 local body = function()
@@ -147,10 +153,10 @@ local body = function()
         if not collapsed then
           table.insert(state.collapsed_projects, project_id)
         end
-        build_and_refresh()
+        build_signal_nodes()
       elseif node.type == 'issue' then
         -- view issue
-
+        ui.view_issue(node.issue.id)
       end
     end,
     prepare_node = helper.prepare_node,
@@ -166,7 +172,9 @@ local body = function()
       vim.keymap.set("n", keymap.add_note, function()
         local issue = signal.selected:get_value()
         if issue and issue.id then
-          ui.add_note(issue.id)
+          ui.add_note(issue.id, function()
+            load_issues()
+          end)
         else
           vim.notify("No issue selected.", vim.log.levels.WARN)
         end

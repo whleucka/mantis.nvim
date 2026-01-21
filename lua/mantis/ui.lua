@@ -23,13 +23,13 @@ function M.select_host()
 end
 
 -- add issue note
-function M.add_note(issue_id)
+function M.add_note(issue_id, cb)
   local ok, mod = pcall(require, "mantis.add_note")
   if not ok then
     vim.notify("Failed to load mantis.add_note: " .. mod, vim.log.levels.ERROR)
     return
   end
-  mod.render(issue_id)
+  mod.render(issue_id, cb)
 end
 
 -- view issue

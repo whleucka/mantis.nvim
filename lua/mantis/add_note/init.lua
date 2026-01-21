@@ -7,7 +7,7 @@ local options = config.options.add_note
 local state = require("mantis.state")
 local helper = require("mantis.add_note.helper")
 
-function M.render(issue_id)
+function M.render(issue_id, refresh_view)
   local popup_width = options.ui.width
   local popup_height = options.ui.height
 
@@ -61,6 +61,7 @@ function M.render(issue_id)
           local ok, _ = state.api:create_issue_note(issue_id, data)
           if ok then
             vim.notify("Note added successfully.")
+            refresh_view()
             popup:unmount()
           else
             vim.notify("Failed to add note.", vim.log.levels.ERROR)
@@ -87,6 +88,7 @@ function M.render(issue_id)
             local ok, _ = state.api:create_issue_note(issue_id, data)
             if ok then
               vim.notify("Note added successfully with time tracking.")
+              refresh_view()
               popup:unmount()
             else
               vim.notify("Failed to add note with time tracking.", vim.log.levels.ERROR)
@@ -107,6 +109,7 @@ function M.render(issue_id)
           local ok, _ = state.api:create_issue_note(issue_id, data)
           if ok then
             vim.notify("Note added successfully with time tracking.")
+            refresh_view()
             popup:unmount()
           else
             vim.notify("Failed to add note with time tracking.", vim.log.levels.ERROR)
