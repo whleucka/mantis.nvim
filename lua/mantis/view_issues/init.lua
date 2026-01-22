@@ -277,6 +277,27 @@ local body = function()
     on_mount = function(component)
       local keymap = options.keymap
       component:set_border_text("bottom", " " .. keymap.help .. " help ", "right")
+
+      -- selection indicator using subtle background
+      local bufnr = component.bufnr
+      local ns_id = vim.api.nvim_create_namespace("mantis_selection")
+      -- subtle background - slightly different from normal bg
+      vim.api.nvim_set_hl(0, "MantisSelection", { bg = "#1e1e2a" })
+
+      local function update_selection_indicator()
+        vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
+        local cursor = vim.api.nvim_win_get_cursor(0)
+        local line = cursor[1] - 1
+        vim.api.nvim_buf_set_extmark(bufnr, ns_id, line, 0, {
+          line_hl_group = "MantisSelection",
+        })
+      end
+
+      update_selection_indicator()
+      vim.api.nvim_create_autocmd("CursorMoved", {
+        buffer = bufnr,
+        callback = update_selection_indicator,
+      })
       -- create issue
       vim.keymap.set("n", keymap.create_issue, function()
         create_issue()
