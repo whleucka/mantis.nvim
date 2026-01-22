@@ -11,6 +11,7 @@ local signal = n.create_signal({
   show_help = false,
   selected = nil,
   mode = 'all',
+  grouped = true,
   issue_nodes = {},
 })
 
@@ -22,7 +23,8 @@ local renderer = n.create_renderer({
 local issues_cache = {} -- store the fetched issues
 
 local function build_signal_nodes()
-  signal.issue_nodes = helper.build_nodes(issues_cache)
+  local grouped = signal.grouped:get_value()
+  signal.issue_nodes = helper.build_nodes(issues_cache, grouped)
 end
 
 local function load_issues()
@@ -342,6 +344,13 @@ local body = function()
       vim.keymap.set("n", keymap.help, function()
         signal.show_help = not signal.show_help:get_value()
       end, { buffer = true, nowait = true })
+      -- toggle group by project
+      vim.keymap.set("n", keymap.toggle_group, function()
+        signal.grouped = not signal.grouped:get_value()
+        build_signal_nodes()
+        local status = signal.grouped:get_value() and "on" or "off"
+        vim.notify("Group by project: " .. status, vim.log.levels.INFO)
+      end, { buffer = true, nowait = true })
       -- refresh
       vim.keymap.set("n", keymap.refresh, function()
         load_issues()
@@ -375,6 +384,7 @@ end
 load_issues()
 
 function M.render()
+  load_issues()
   renderer:render(body)
 end
 

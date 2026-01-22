@@ -30,6 +30,13 @@ M.options = {
     },
     keymap = {
       quit = "q",
+      refresh = "r",
+      scroll_down = "j",
+      scroll_up = "k",
+      page_down = "<C-d>",
+      page_up = "<C-u>",
+      goto_top = "gg",
+      goto_bottom = "G",
     }
   },
   view_issues = {
@@ -62,6 +69,7 @@ M.options = {
       change_priority = "p",
       change_category = "c",
       filter = "f",
+      toggle_group = "g",
       help = "?",
       refresh = "r",
       quit = "q",

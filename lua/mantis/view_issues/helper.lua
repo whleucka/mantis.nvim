@@ -38,8 +38,9 @@ function M.get_help()
     {
       title = "Essential",
       items = {
-        { key = "refresh", label = "Refresh" },
-        { key = "quit",    label = "Quit" },
+        { key = "toggle_group", label = "Toggle group" },
+        { key = "refresh",      label = "Refresh" },
+        { key = "quit",         label = "Quit" },
       },
     },
   }
@@ -145,7 +146,9 @@ function M.prepare_node(node, line, component)
     local issue = node.issue
     local columns = options.ui.columns
 
-    if node.index == node.count then
+    if node.ungrouped then
+      line:append(n.text("  ", "Comment"))
+    elseif node.index == node.count then
       line:append(n.text("  └── ", "Comment"))
     else
       line:append(n.text("  ├── ", "Comment"))
@@ -214,12 +217,42 @@ function M.prepare_node(node, line, component)
   return line
 end
 
-function M.build_nodes(issues)
+function M.build_nodes(issues, grouped)
   local nodes = {}
+
+  -- default to grouped if not specified
+  if grouped == nil then
+    grouped = true
+  end
+
+  if not grouped then
+    -- flat list sorted by updated_at
+    local sorted_issues = {}
+    for _, issue in ipairs(issues) do
+      table.insert(sorted_issues, issue)
+    end
+    table.sort(sorted_issues, function(a, b)
+      return a.updated_at > b.updated_at
+    end)
+
+    for i, issue in ipairs(sorted_issues) do
+      local _issue = {
+        index = i,
+        count = #sorted_issues,
+        type = 'issue',
+        issue = issue,
+        ungrouped = true,
+      }
+      table.insert(nodes, n.node(_issue))
+    end
+
+    return nodes
+  end
+
+  -- grouped by project
   local projects = {}
   local sorted_projects = {}
 
-  -- projects are grouped
   for _, issue in ipairs(issues) do
     local pid = issue.project.id
     if not projects[pid] then
