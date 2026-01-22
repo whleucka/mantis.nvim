@@ -88,6 +88,10 @@ local body = function()
           vim.notify("Issue successfully created", vim.log.levels.INFO)
           ui.view_issues()
           renderer:close()
+          signal.summary = ""
+          signal.description = ""
+          signal.category_name = ""
+          signal.handler_name = ""
         end
       end,
       on_mount = function(component)
