@@ -1,4 +1,4 @@
-![mantis.nvim](assets/logo.png "mantis.nvim")
+<img width="100%" height="90" alt="image" src="https://github.com/user-attachments/assets/a790556a-e7d6-4eb7-b46b-89c1e8cad117" />
 
 [MantisBT](https://mantisbt.org) plugin for Neovim.
 
