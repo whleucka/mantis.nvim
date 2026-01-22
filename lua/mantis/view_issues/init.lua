@@ -4,6 +4,7 @@ local ui = require("mantis.ui")
 local n = require("nui-components")
 local state = require("mantis.state")
 local config = require("mantis.config")
+local util = require("mantis.util")
 local options = config.options.view_issues
 local helper = require("mantis.view_issues.helper")
 
@@ -25,6 +26,31 @@ local issues_cache = {} -- store the fetched issues
 local function build_signal_nodes()
   local grouped = signal.grouped:get_value()
   signal.issue_nodes = helper.build_nodes(issues_cache, grouped)
+end
+
+-- Update a single issue in cache and rebuild nodes (avoids API re-fetch)
+local function update_cache_issue(updated_issue)
+  for i, issue in ipairs(issues_cache) do
+    if issue.id == updated_issue.id then
+      issues_cache[i] = updated_issue
+      break
+    end
+  end
+  table.sort(issues_cache, function(a, b)
+    return a.updated_at > b.updated_at
+  end)
+  build_signal_nodes()
+end
+
+-- Remove an issue from cache and rebuild nodes
+local function remove_cache_issue(issue_id)
+  for i, issue in ipairs(issues_cache) do
+    if issue.id == issue_id then
+      table.remove(issues_cache, i)
+      break
+    end
+  end
+  build_signal_nodes()
 end
 
 local function load_issues()
@@ -49,13 +75,9 @@ local function load_issues()
 end
 
 local function update_issue(component, issue_id, issue_data)
-  local node = component:get_tree():get_node()
   local ok, res = state.api:update_issue(issue_id, issue_data)
   if ok and res and #res.issues > 0 then
-    local updated_issue = res.issues[1]
-    node.issue = updated_issue
-    -- a full refresh is required to re-sort the issues by updated_at
-    load_issues()
+    update_cache_issue(res.issues[1])
   end
 end
 
@@ -112,7 +134,11 @@ end
 
 local function add_note(issue_id)
   ui.add_note(issue_id, function()
-    load_issues()
+    -- fetch only the updated issue instead of all issues
+    local ok, res = state.api:get_issue(issue_id)
+    if ok and res and res.issues and res.issues[1] then
+      update_cache_issue(res.issues[1])
+    end
   end)
 end
 
@@ -159,7 +185,7 @@ local function delete_issue(issue_id)
         local ok, _ = state.api:delete_issue(issue_id)
         if ok then
           vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
-          load_issues()
+          remove_cache_issue(issue_id)
         else
           vim.notify('Failed to delete issue #' .. issue_id, vim.log.levels.ERROR)
         end
@@ -183,7 +209,6 @@ local function filter_view()
 end
 
 local function assign_user(component, project_id, issue_id)
-  local node = component:get_tree():get_node()
   local ok, users_data = state.api:get_project_users(project_id)
   if not ok then
     return
@@ -202,18 +227,14 @@ local function assign_user(component, project_id, issue_id)
     local data = {
       handler = { name = choice.name }
     }
-    local ok, res = state.api:update_issue(issue_id, data)
-    if ok and res and #res.issues > 0 then
-      local updated_issue = res.issues[1]
-      node.issue = updated_issue
-      load_issues()
+    local res_ok, res = state.api:update_issue(issue_id, data)
+    if res_ok and res and #res.issues > 0 then
+      update_cache_issue(res.issues[1])
     end
   end)
 end
 
-local function change_summary(component, issue_id, summary)
-  local node = component:get_tree():get_node()
-
+local function change_summary(issue_id, summary)
   local new_summary = vim.fn.input("New summary: ", summary)
   if not new_summary or new_summary == "" then
     return
@@ -224,9 +245,7 @@ local function change_summary(component, issue_id, summary)
   }
   local ok, res = state.api:update_issue(issue_id, data)
   if ok and res and #res.issues > 0 then
-    local updated_issue = res.issues[1]
-    node.issue = updated_issue
-    load_issues()
+    update_cache_issue(res.issues[1])
   end
 end
 
@@ -313,7 +332,7 @@ local body = function()
         local issue = get_selected_issue()
         if not issue then return end
         local url = string.format("%s/view.php?id=%d", state.api.url, issue.id)
-        vim.system({ 'xdg-open', url }, { detach = true })
+        util.open_url(url)
       end, { buffer = true, nowait = true })
       -- change status
       vim.keymap.set("n", keymap.change_status, function()
@@ -337,13 +356,13 @@ local body = function()
       vim.keymap.set("n", keymap.change_category, function()
         local issue = get_selected_issue()
         if not issue then return end
-        update_issue_options(component, issue, 'category', config.options.issue_category_options)
+        update_issue_options(component, issue, 'category', nil) -- categories fetched from API
       end, { buffer = true, nowait = true })
       -- change summary
       vim.keymap.set("n", keymap.change_summary, function()
         local issue = get_selected_issue()
         if not issue then return end
-        change_summary(component, issue.id, issue.summary)
+        change_summary(issue.id, issue.summary)
       end, { buffer = true, nowait = true })
       -- assign issue
       vim.keymap.set("n", keymap.assign_issue, function()

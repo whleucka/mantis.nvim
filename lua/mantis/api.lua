@@ -32,22 +32,37 @@ local M = {}
 local config = require('mantis.config')
 local curl = require('plenary.curl')
 
----@return MantisAPI
+--- Create a new MantisAPI instance
+---@param host_config table|nil Host configuration with url, token/env, and optional name
+---@return MantisAPI|nil
 function M.new(host_config)
-  local instance = {}
   if not host_config then
-    vim.notify('Mantis: Host "' .. (host_config.url or 'default') .. '" not configured.', vim.log.levels.ERROR)
+    vim.notify('Mantis: No host configuration provided.', vim.log.levels.ERROR)
     return nil
   end
 
+  local instance = {}
   instance.name = host_config.name
   instance.url = host_config.url
-  instance.token = host_config.token or os.getenv(host_config.env)
 
-  if not instance.url or not instance.token then
-    vim.notify('Mantis: URL or token not configured for host "' .. (host_config.url or 'default') .. '".', vim.log
-      .levels
-      .ERROR)
+  -- resolve token from direct value or environment variable
+  if host_config.token then
+    instance.token = host_config.token
+  elseif host_config.env then
+    instance.token = os.getenv(host_config.env)
+    if not instance.token then
+      vim.notify('Mantis: Environment variable "' .. host_config.env .. '" not set.', vim.log.levels.ERROR)
+      return nil
+    end
+  end
+
+  if not instance.url then
+    vim.notify('Mantis: URL not configured for host.', vim.log.levels.ERROR)
+    return nil
+  end
+
+  if not instance.token then
+    vim.notify('Mantis: Token not configured for host "' .. (instance.url or 'unknown') .. '".', vim.log.levels.ERROR)
     return nil
   end
 
