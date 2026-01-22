@@ -7,7 +7,6 @@
 - Supports multiple MantisBT hosts
 - Fully reactive UI powered by **nui-components**
 - Cross-platform (Linux, macOS, Windows)
-- Fast. Like, *why-is-this-Lua-so-fast* fast ⚡
 
 ### Issues
 
