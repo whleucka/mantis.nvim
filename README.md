@@ -221,7 +221,6 @@ require('mantis').setup({
 
 | Command | Description |
 |---------|-------------|
-| `:Mantis` | Open the issues view |
 | `:MantisIssues` | Open the issues view |
 | `:MantisSelectHost` | Switch between configured hosts |
 
