@@ -154,10 +154,16 @@ function M.prepare_node(node, line, component)
       line:append(n.text("  ├── ", "Comment"))
     end
 
+    local status_color = issue.status.color
+    -- Validate color: must be a hex color (#RRGGBB or #RGB) or a valid named color
+    -- CSS values like 'currentcolor' are not valid in Neovim
+    if not status_color or not status_color:match("^#%x+$") then
+      status_color = "#808080" -- fallback to gray
+    end
     local status_bg = "MantisStatusBg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_bg, { bg = issue.status.color })
+    vim.api.nvim_set_hl(0, status_bg, { bg = status_color })
     local status_fg = "MantisStatusFg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_fg, { fg = issue.status.color })
+    vim.api.nvim_set_hl(0, status_fg, { fg = status_color })
 
     if columns.priority then
       local priority_emojis = config.options.priority_emojis
