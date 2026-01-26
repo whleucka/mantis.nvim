@@ -73,6 +73,9 @@ function M.format_issue_header(issue, width)
   add_field("Created", M.format_datetime(issue.created_at), "Comment")
   add_field("Updated", M.format_datetime(issue.updated_at) .. " (" .. M.time_ago(issue.updated_at) .. ")", "Comment")
 
+  local note_count = issue.notes and #issue.notes or 0
+  add_field("Notes", "💬 " .. note_count, "Comment")
+
   return lines
 end
 
