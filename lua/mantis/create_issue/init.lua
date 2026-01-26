@@ -241,7 +241,10 @@ local body = function()
       validate = n.validator.min_length(1),
       on_change = function(value, component)
         signal.description = value
-      end
+      end,
+      on_mount = function(component)
+        component:set_border_text("bottom", " " .. keymap.quit .. ": quit | " .. keymap.submit .. ": submit ", "right")
+      end,
     })
   )
 end

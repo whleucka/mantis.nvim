@@ -57,7 +57,7 @@ function M.render(issue_id)
       text = {
         top = " Issue #" .. issue_id .. " ",
         top_align = "left",
-        bottom = " q: quit | r: refresh | N: add note ",
+        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add note ",
         bottom_align = "right",
       },
     },

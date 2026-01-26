@@ -19,6 +19,8 @@ function M.render(issue_id, refresh_view)
       text = {
         top = "Add Note to Issue #" .. issue_id,
         top_align = "left",
+        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.submit .. ": submit ",
+        bottom_align = "right",
       },
     },
     position = "50%",
