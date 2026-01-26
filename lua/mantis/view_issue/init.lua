@@ -6,6 +6,7 @@ local config = require("mantis.config")
 local options = config.options.view_issue
 local state = require("mantis.state")
 local helper = require("mantis.view_issue.helper")
+local add_note = require("mantis.add_note")
 
 local function render_content(popup, issue, width)
   local formatted = helper.format_issue(issue, width)
@@ -56,7 +57,7 @@ function M.render(issue_id)
       text = {
         top = " Issue #" .. issue_id .. " ",
         top_align = "left",
-        bottom = " q: quit | r: refresh ",
+        bottom = " q: quit | r: refresh | N: add note ",
         bottom_align = "right",
       },
     },
@@ -99,6 +100,16 @@ function M.render(issue_id)
       else
         vim.notify("Failed to refresh issue #" .. issue_id, vim.log.levels.ERROR)
       end
+    end, { noremap = true, silent = true })
+
+    popup:map("n", keymap.add_note, function()
+      add_note.render(issue_id, function()
+        local refreshed_issue = fetch_issue(issue_id)
+        if refreshed_issue then
+          issue = refreshed_issue
+          render_content(popup, issue, popup_width)
+        end
+      end)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.scroll_down, function()

@@ -26,7 +26,7 @@ function M.render(issue_id, refresh_view)
       width = popup_width,
       height = popup_height,
     },
-    zindex = 200,
+    zindex = 250,
     win_options = { wrap = true },
   })
 
