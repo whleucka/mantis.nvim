@@ -16,7 +16,7 @@ M.options = {
   create_issue = {
     ui = {
       width = 80,
-      height = 15,
+      height = 21,
     },
     keymap = {
       quit = "q",
@@ -79,6 +79,7 @@ M.options = {
   issue_severity_options = {},
   issue_priority_options = {},
   issue_resolution_options = {},
+  issue_reproducibility_options = {},
   issue_filter_options = {
     'all',
     'assigned',

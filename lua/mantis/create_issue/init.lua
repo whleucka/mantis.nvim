@@ -13,6 +13,9 @@ local signal = n.create_signal({
   description = "",
   category_name = "",
   handler_name = "",
+  priority_name = "",
+  severity_name = "",
+  reproducibility_name = "",
 })
 
 local renderer = n.create_renderer({
@@ -56,6 +59,60 @@ local function get_categories()
   return nodes
 end
 
+local function get_priorities()
+  local nodes = {}
+  local opts = config.options.issue_priority_options
+  if #opts == 0 then
+    table.insert(nodes, n.option("normal", { id = "normal" }))
+    signal.priority_name = "normal"
+  else
+    -- Put "normal" first, then the rest
+    for _, opt in ipairs(opts) do
+      if opt.name == "normal" then
+        table.insert(nodes, 1, n.option(opt.name, { id = opt.name }))
+      else
+        table.insert(nodes, n.option(opt.name, { id = opt.name }))
+      end
+    end
+    signal.priority_name = "normal"
+  end
+  return nodes
+end
+
+local function get_severities()
+  local nodes = {}
+  local opts = config.options.issue_severity_options
+  if #opts == 0 then
+    table.insert(nodes, n.option("minor", { id = "minor" }))
+    signal.severity_name = "minor"
+  else
+    for i, opt in ipairs(opts) do
+      if i == 1 then
+        signal.severity_name = opt.name
+      end
+      table.insert(nodes, n.option(opt.name, { id = opt.name }))
+    end
+  end
+  return nodes
+end
+
+local function get_reproducibilities()
+  local nodes = {}
+  local opts = config.options.issue_reproducibility_options
+  if #opts == 0 then
+    table.insert(nodes, n.option("always", { id = "always" }))
+    signal.reproducibility_name = "always"
+  else
+    for i, opt in ipairs(opts) do
+      if i == 1 then
+        signal.reproducibility_name = opt.name
+      end
+      table.insert(nodes, n.option(opt.name, { id = opt.name }))
+    end
+  end
+  return nodes
+end
+
 local body = function()
   local keymap = options.keymap
 
@@ -77,6 +134,15 @@ local body = function()
             },
             handler = {
               name = s.handler_name
+            },
+            priority = {
+              name = s.priority_name
+            },
+            severity = {
+              name = s.severity_name
+            },
+            reproducibility = {
+              name = s.reproducibility_name
             }
           }
           local ok, _ = state.api:create_issue(data)
@@ -92,6 +158,9 @@ local body = function()
           signal.description = ""
           signal.category_name = ""
           signal.handler_name = ""
+          signal.priority_name = ""
+          signal.severity_name = ""
+          signal.reproducibility_name = ""
         end
       end,
       on_mount = function(component)
@@ -114,8 +183,7 @@ local body = function()
         on_change = function(node)
           signal.handler_name = node.id
         end,
-        }
-      ),
+      }),
       n.select({
         flex = 1,
         border_label = "Category",
@@ -124,8 +192,37 @@ local body = function()
         on_change = function(node)
           signal.category_name = node.id
         end,
-        }
-      )
+      }),
+      n.select({
+        flex = 1,
+        border_label = "Priority",
+        selected = signal.priority_name,
+        data = get_priorities(),
+        on_change = function(node)
+          signal.priority_name = node.id
+        end,
+      })
+    ),
+    n.columns(
+      { size = 1 },
+      n.select({
+        flex = 1,
+        border_label = "Severity",
+        selected = signal.severity_name,
+        data = get_severities(),
+        on_change = function(node)
+          signal.severity_name = node.id
+        end,
+      }),
+      n.select({
+        flex = 1,
+        border_label = "Reproducibility",
+        selected = signal.reproducibility_name,
+        data = get_reproducibilities(),
+        on_change = function(node)
+          signal.reproducibility_name = node.id
+        end,
+      })
     ),
     n.text_input({
       autofocus = false,
