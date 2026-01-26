@@ -284,9 +284,7 @@ nvim
 
 <img width="1449" height="991" alt="image" src="https://github.com/user-attachments/assets/8c30bbfd-1590-4dd4-9763-d05b30eb96a3" />
 <img width="922" height="696" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
-<img width="877" height="517" alt="image" src="https://github.com/user-attachments/assets/01b4b97a-ab73-42fb-b16f-109b1e89f8e5" />
-
-
+<img width="894" height="649" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
 ## License
 
 MIT
