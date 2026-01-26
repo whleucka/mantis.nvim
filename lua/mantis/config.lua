@@ -41,6 +41,7 @@ M.options = {
     }
   },
   view_issues = {
+    default_filter = 'all', -- default filter: 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
     ui = {
       -- column width

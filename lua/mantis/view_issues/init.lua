@@ -8,10 +8,14 @@ local util = require("mantis.util")
 local options = config.options.view_issues
 local helper = require("mantis.view_issues.helper")
 
+local function get_current_filter()
+  return state.current_filter or options.default_filter or 'all'
+end
+
 local signal = n.create_signal({
   show_help = false,
   selected = nil,
-  mode = 'all',
+  mode = get_current_filter(),
   grouped = true,
   issue_nodes = {},
 })
@@ -204,6 +208,7 @@ local function filter_view()
     end
 
     signal.mode = choice
+    state.current_filter = choice -- persist filter across sessions
     load_issues()
   end)
 end
@@ -424,6 +429,8 @@ end
 load_issues()
 
 function M.render()
+  -- sync signal mode with persisted filter
+  signal.mode = get_current_filter()
   load_issues()
   renderer:render(body)
 end
