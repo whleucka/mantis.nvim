@@ -57,21 +57,25 @@ local function remove_cache_issue(issue_id)
   build_signal_nodes()
 end
 
-local function load_issues()
+local function fetch_issues(page)
   local ok, res = false, nil
   local mode = signal.mode:get_value()
   if mode == 'all' then
-    ok, res = state.api:get_issues(options.limit, state.page)
+    ok, res = state.api:get_issues(options.limit, page)
   elseif mode == 'monitored' then
-    ok, res = state.api:get_monitored_issues(options.limit, state.page)
+    ok, res = state.api:get_monitored_issues(options.limit, page)
   elseif mode == 'assigned' then
-    ok, res = state.api:get_assigned_issues(options.limit, state.page)
+    ok, res = state.api:get_assigned_issues(options.limit, page)
   elseif mode == 'unassigned' then
-    ok, res = state.api:get_unassigned_issues(options.limit, state.page)
+    ok, res = state.api:get_unassigned_issues(options.limit, page)
   elseif mode == 'reported' then
-    ok, res = state.api:get_reported_issues(options.limit, state.page)
+    ok, res = state.api:get_reported_issues(options.limit, page)
   end
+  return ok, res
+end
 
+local function load_issues()
+  local ok, res = fetch_issues(state.page)
   if ok and res and res.issues then
     issues_cache = res.issues
     build_signal_nodes()
@@ -172,10 +176,10 @@ local function change_page(direction)
     return
   end
 
-  local ok, res = state.api:get_issues(options.limit, new_page)
+  local ok, res = fetch_issues(new_page)
   if ok and res and res.issues and #res.issues > 0 then
     state.page = new_page
-    issues_cache = res.issues -- update cache
+    issues_cache = res.issues
     build_signal_nodes()
   else
     vim.notify("No more issues on the next page.", vim.log.levels.INFO)
