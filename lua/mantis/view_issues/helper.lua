@@ -138,7 +138,11 @@ end
 function M.prepare_node(node, line, component)
   local type = node.type
 
-  if type == 'project' then
+  if type == 'empty' then
+    local message = "🎉 There are currently no issues"
+    local padding = math.floor((options.ui.width - #message) / 2)
+    line:append(n.text(string.rep(" ", padding) .. message, "Comment"))
+  elseif type == 'project' then
     local project = node.project
     line:append(n.text("──", "Comment"))
     line:append(n.text(string.format("  %s (%d)", project.name, node.count), "Directory"))
@@ -225,6 +229,12 @@ end
 
 function M.build_nodes(issues, grouped)
   local nodes = {}
+
+  -- empty state
+  if not issues or #issues == 0 then
+    table.insert(nodes, n.node({ type = 'empty' }))
+    return nodes
+  end
 
   -- default to grouped if not specified
   if grouped == nil then
