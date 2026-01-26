@@ -21,6 +21,12 @@ local signal = n.create_signal({
 local renderer = n.create_renderer({
   width = options.ui.width,
   height = options.ui.height,
+  keymap = {
+    close = options.keymap.quit,
+  },
+  on_unmount = function()
+    ui.view_issues()
+  end,
 })
 
 local function get_users()
@@ -152,7 +158,6 @@ local body = function()
             return
           end
           vim.notify("Issue successfully created", vim.log.levels.INFO)
-          ui.view_issues()
           renderer:close()
           signal.summary = ""
           signal.description = ""
@@ -163,14 +168,6 @@ local body = function()
           signal.reproducibility_name = ""
         end
       end,
-      on_mount = function(component)
-        local keymap = options.keymap
-        -- quit
-        vim.keymap.set("n", keymap.quit, function()
-          ui.view_issues()
-          renderer:close()
-        end, { buffer = true, nowait = true })
-      end
     },
     n.columns(
       { size = 1 },
