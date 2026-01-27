@@ -185,11 +185,295 @@ function M.render()
     end)
     if ok and res and res.issues and #res.issues > 0 then
       state.page = new_page
+      state.clear_selection() -- Clear selection on page change
       issues_cache = res.issues
       build_signal_nodes()
     else
       vim.notify("No more issues on the next page.", vim.log.levels.INFO)
     end
+  end
+
+  -- Selection functions
+  local function toggle_select()
+    local issue = signal.selected:get_value()
+    if not issue then
+      vim.notify("No issue selected.", vim.log.levels.WARN)
+      return
+    end
+    state.toggle_selection(issue.id)
+    build_signal_nodes()
+  end
+
+  local function select_all_issues()
+    for _, issue in ipairs(issues_cache) do
+      state.selected_issues[issue.id] = true
+    end
+    build_signal_nodes()
+    vim.notify("Selected " .. #issues_cache .. " issues.", vim.log.levels.INFO)
+  end
+
+  local function clear_selection()
+    state.clear_selection()
+    build_signal_nodes()
+    vim.notify("Selection cleared.", vim.log.levels.INFO)
+  end
+
+  -- Helper to get issues from selected IDs
+  local function get_selected_issues_from_cache()
+    local selected = {}
+    local ids = state.get_selected_ids()
+    for _, id in ipairs(ids) do
+      for _, issue in ipairs(issues_cache) do
+        if issue.id == id then
+          table.insert(selected, issue)
+          break
+        end
+      end
+    end
+    return selected
+  end
+
+  -- Check if all selected issues are from the same project
+  local function validate_same_project(selected_issues)
+    if #selected_issues == 0 then
+      return false, nil
+    end
+    local project_id = selected_issues[1].project.id
+    for _, issue in ipairs(selected_issues) do
+      if issue.project.id ~= project_id then
+        return false, nil
+      end
+    end
+    return true, project_id
+  end
+
+  -- Batch operation helper
+  local function batch_update(selected_issues, data_fn, on_complete)
+    local success_count = 0
+    local fail_count = 0
+    local total = #selected_issues
+
+    for i, issue in ipairs(selected_issues) do
+      local issue_data = data_fn(issue)
+      if issue_data then
+        local ok, res = state.api:update_issue(issue.id, issue_data)
+        if ok and res and #res.issues > 0 then
+          update_cache_issue(res.issues[1])
+          success_count = success_count + 1
+        else
+          fail_count = fail_count + 1
+        end
+      end
+    end
+
+    state.clear_selection()
+    build_signal_nodes()
+
+    if fail_count > 0 then
+      vim.notify(string.format("Updated %d/%d issues (%d failed)", success_count, total, fail_count), vim.log.levels.WARN)
+    else
+      vim.notify(string.format("Updated %d issues", success_count), vim.log.levels.INFO)
+    end
+
+    if on_complete then
+      on_complete()
+    end
+  end
+
+  -- Batch change status
+  local function batch_change_status()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+
+    vim.ui.select(config.options.issue_status_options, {
+      prompt = string.format("Change status for %d issues", count),
+      format_item = function(item) return item.name end,
+    }, function(choice)
+      if not choice then return end
+
+      local function do_update(resolution_choice)
+        batch_update(selected_issues, function(issue)
+          local data = { status = { name = choice.name } }
+          if resolution_choice then
+            data.resolution = { id = resolution_choice.id }
+          end
+          return data
+        end)
+      end
+
+      if choice.name == 'resolved' or choice.name == 'closed' then
+        vim.ui.select(config.options.issue_resolution_options, {
+          prompt = "Select a resolution",
+          format_item = function(item) return item.name end,
+        }, function(resolution_choice)
+          if not resolution_choice then return end
+          do_update(resolution_choice)
+        end)
+      else
+        do_update(nil)
+      end
+    end)
+  end
+
+  -- Batch change priority
+  local function batch_change_priority()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+
+    vim.ui.select(config.options.issue_priority_options, {
+      prompt = string.format("Change priority for %d issues", count),
+      format_item = function(item) return item.name end,
+    }, function(choice)
+      if not choice then return end
+
+      batch_update(selected_issues, function(issue)
+        return { priority = { name = choice.name } }
+      end)
+    end)
+  end
+
+  -- Batch change severity
+  local function batch_change_severity()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+
+    vim.ui.select(config.options.issue_severity_options, {
+      prompt = string.format("Change severity for %d issues", count),
+      format_item = function(item) return item.name end,
+    }, function(choice)
+      if not choice then return end
+
+      batch_update(selected_issues, function(issue)
+        return { severity = { name = choice.name } }
+      end)
+    end)
+  end
+
+  -- Batch change category (project-specific)
+  local function batch_change_category()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+    local same_project, project_id = validate_same_project(selected_issues)
+    if not same_project then
+      vim.notify("Cannot batch change category: selected issues are from different projects.", vim.log.levels.ERROR)
+      return
+    end
+
+    local ok, categories = state.get_project_categories(project_id)
+    if not ok then
+      vim.notify("Failed to load categories.", vim.log.levels.ERROR)
+      return
+    end
+
+    vim.ui.select(categories, {
+      prompt = string.format("Change category for %d issues", count),
+      format_item = function(item) return item.name end,
+    }, function(choice)
+      if not choice then return end
+
+      batch_update(selected_issues, function(issue)
+        return { category = { name = choice.name } }
+      end)
+    end)
+  end
+
+  -- Batch assign user (project-specific)
+  local function batch_assign_user()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+    local same_project, project_id = validate_same_project(selected_issues)
+    if not same_project then
+      vim.notify("Cannot batch assign: selected issues are from different projects.", vim.log.levels.ERROR)
+      return
+    end
+
+    local ok, users = state.get_project_users(project_id)
+    if not ok then
+      vim.notify("Failed to load users.", vim.log.levels.ERROR)
+      return
+    end
+
+    vim.ui.select(users, {
+      prompt = string.format("Assign user to %d issues", count),
+      format_item = function(item) return item.name end,
+    }, function(choice)
+      if not choice then return end
+
+      batch_update(selected_issues, function(issue)
+        return { handler = { name = choice.name } }
+      end)
+    end)
+  end
+
+  -- Batch delete
+  local function batch_delete()
+    local count = state.selection_count()
+    if count == 0 then
+      vim.notify("No issues selected.", vim.log.levels.WARN)
+      return
+    end
+
+    local selected_issues = get_selected_issues_from_cache()
+    local ids = {}
+    for _, issue in ipairs(selected_issues) do
+      table.insert(ids, "#" .. issue.id)
+    end
+
+    vim.ui.input({
+      prompt = string.format('Delete %d issues (%s)? Type "yes" to confirm: ', count, table.concat(ids, ", ")),
+    }, function(input)
+      if not input or input:lower() ~= "yes" then
+        vim.notify("Batch delete cancelled.", vim.log.levels.INFO)
+        return
+      end
+
+      local success_count = 0
+      local fail_count = 0
+
+      for _, issue in ipairs(selected_issues) do
+        local ok, _ = state.api:delete_issue(issue.id)
+        if ok then
+          remove_cache_issue(issue.id)
+          success_count = success_count + 1
+        else
+          fail_count = fail_count + 1
+        end
+      end
+
+      state.clear_selection()
+      build_signal_nodes()
+
+      if fail_count > 0 then
+        vim.notify(string.format("Deleted %d/%d issues (%d failed)", success_count, count, fail_count), vim.log.levels.WARN)
+      else
+        vim.notify(string.format("Deleted %d issues", success_count), vim.log.levels.INFO)
+      end
+    end)
   end
 
   local function delete_issue(issue_id)
@@ -416,6 +700,44 @@ function M.render()
 
         vim.keymap.set("n", keymap.next_page, function()
           change_page(1)
+        end, { buffer = true, nowait = true })
+
+        -- Selection keybindings
+        vim.keymap.set("n", keymap.toggle_select, function()
+          toggle_select()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.select_all, function()
+          select_all_issues()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.clear_selection, function()
+          clear_selection()
+        end, { buffer = true, nowait = true })
+
+        -- Batch operation keybindings
+        vim.keymap.set("n", keymap.batch_status, function()
+          batch_change_status()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.batch_priority, function()
+          batch_change_priority()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.batch_severity, function()
+          batch_change_severity()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.batch_category, function()
+          batch_change_category()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.batch_assign, function()
+          batch_assign_user()
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.batch_delete, function()
+          batch_delete()
         end, { buffer = true, nowait = true })
 
         vim.keymap.set({ "n", "i" }, keymap.quit, function()

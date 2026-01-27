@@ -75,6 +75,17 @@ M.options = {
       help = "?",
       refresh = "r",
       quit = "q",
+      -- Selection
+      toggle_select = "<Space>",
+      select_all = "<C-a>",
+      clear_selection = "<C-x>",
+      -- Batch operations
+      batch_status = "bs",
+      batch_priority = "bp",
+      batch_severity = "bv",
+      batch_category = "bc",
+      batch_assign = "ba",
+      batch_delete = "bD",
     }
   },
   issue_status_options = {},

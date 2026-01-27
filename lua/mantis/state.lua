@@ -11,6 +11,10 @@ local M = {
   _users_cache = {},
   ---@type table<number, table[]> project_id -> categories array
   _categories_cache = {},
+
+  -- Selection state for batch operations
+  ---@type table<number, boolean> issue_id -> selected
+  selected_issues = {},
 }
 
 --- Get project users with caching
@@ -55,6 +59,48 @@ end
 function M.clear_caches()
   M._users_cache = {}
   M._categories_cache = {}
+end
+
+--- Toggle selection state for an issue
+---@param id number
+function M.toggle_selection(id)
+  if M.selected_issues[id] then
+    M.selected_issues[id] = nil
+  else
+    M.selected_issues[id] = true
+  end
+end
+
+--- Check if an issue is selected
+---@param id number
+---@return boolean
+function M.is_selected(id)
+  return M.selected_issues[id] == true
+end
+
+--- Clear all selections
+function M.clear_selection()
+  M.selected_issues = {}
+end
+
+--- Get count of selected issues
+---@return number
+function M.selection_count()
+  local count = 0
+  for _ in pairs(M.selected_issues) do
+    count = count + 1
+  end
+  return count
+end
+
+--- Get array of selected issue IDs
+---@return number[]
+function M.get_selected_ids()
+  local ids = {}
+  for id in pairs(M.selected_issues) do
+    table.insert(ids, id)
+  end
+  return ids
 end
 
 return M

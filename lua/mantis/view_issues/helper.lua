@@ -28,11 +28,30 @@ function M.get_help()
         { key = "create_issue",    label = "Create issue" },
         { key = "delete_issue",    label = "Delete issue" },
         { key = "assign_issue",    label = "Assign issue" },
-        { key = "change_summary",   label = "Change summary" },
+        { key = "change_summary",  label = "Change summary" },
         { key = "change_status",   label = "Change status" },
         { key = "change_severity", label = "Change severity" },
         { key = "change_priority", label = "Change priority" },
         { key = "change_category", label = "Change category" },
+      },
+    },
+    {
+      title = "Selection",
+      items = {
+        { key = "toggle_select",   label = "Toggle select" },
+        { key = "select_all",      label = "Select all" },
+        { key = "clear_selection", label = "Clear selection" },
+      },
+    },
+    {
+      title = "Batch Ops",
+      items = {
+        { key = "batch_status",   label = "Batch status" },
+        { key = "batch_priority", label = "Batch priority" },
+        { key = "batch_severity", label = "Batch severity" },
+        { key = "batch_category", label = "Batch category" },
+        { key = "batch_assign",   label = "Batch assign" },
+        { key = "batch_delete",   label = "Batch delete" },
       },
     },
     {
@@ -150,12 +169,18 @@ function M.prepare_node(node, line, component)
     local issue = node.issue
     local columns = options.ui.columns
 
+    -- Selection checkbox
+    local is_selected = state.is_selected(issue.id)
+    local checkbox = is_selected and "[x] " or "[ ] "
+    local checkbox_hl = is_selected and "DiagnosticOk" or "Comment"
+    line:append(n.text(checkbox, checkbox_hl))
+
     if node.ungrouped then
-      line:append(n.text("  ", "Comment"))
+      line:append(n.text("", "Comment"))
     elseif node.index == node.count then
-      line:append(n.text("  └── ", "Comment"))
+      line:append(n.text("└── ", "Comment"))
     else
-      line:append(n.text("  ├── ", "Comment"))
+      line:append(n.text("├── ", "Comment"))
     end
 
     local status_color = issue.status.color
