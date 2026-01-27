@@ -19,7 +19,7 @@ function M.render()
     show_help = false,
     selected = nil,
     mode = get_current_filter(),
-    grouped = true,
+    grouped = state.grouped,
     issue_nodes = {},
   })
 
@@ -399,6 +399,7 @@ function M.render()
 
         vim.keymap.set("n", keymap.toggle_group, function()
           signal.grouped = not signal.grouped:get_value()
+          state.grouped = signal.grouped:get_value()
           build_signal_nodes()
           local status = signal.grouped:get_value() and "on" or "off"
           vim.notify("Group by project: " .. status, vim.log.levels.INFO)

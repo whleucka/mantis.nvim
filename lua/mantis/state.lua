@@ -4,6 +4,7 @@ local M = {
   page = 1,
   collapsed_projects = {},
   current_filter = nil, -- persists filter across view_issues sessions
+  grouped = true, -- persists grouped view across view_issues sessions
 
   -- Per-project caches (cleared on host switch)
   ---@type table<number, table[]> project_id -> users array
