@@ -9,8 +9,8 @@ local util = require("mantis.util")
 
 function M.render(issue_id, refresh_view)
   local options = config.options.add_note
-  local popup_width = options.ui.width
-  local popup_height = options.ui.height
+  local popup_width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width)
+  local popup_height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height)
 
   local popup = Popup({
     enter = true,

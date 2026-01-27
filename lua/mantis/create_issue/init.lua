@@ -21,8 +21,8 @@ function M.render(project_id)
   })
 
   local renderer = n.create_renderer({
-    width = options.ui.width,
-    height = options.ui.height,
+    width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width),
+    height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height),
     keymap = {
       close = options.keymap.quit,
     },

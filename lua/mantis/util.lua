@@ -112,4 +112,31 @@ function M.with_loading(message, fn)
   return unpack(results)
 end
 
+--- Resolve a dimension value (percentage or absolute) with clamping
+---@param value string|number The dimension value ("90%" or 80)
+---@param total number The total screen dimension (vim.o.columns or vim.o.lines)
+---@param max number|nil Optional maximum value to clamp to
+---@param min number|nil Optional minimum value (default 20)
+---@return number
+function M.resolve_dimension(value, total, max, min)
+  min = min or 20
+  local result
+  if type(value) == "string" and value:match("%%$") then
+    local pct = tonumber(value:match("^(%d+)")) or 80
+    result = math.floor(total * pct / 100)
+  else
+    result = tonumber(value) or 80
+  end
+
+  -- Clamp to max if specified
+  if max and result > max then
+    result = max
+  end
+
+  -- Ensure minimum size and don't exceed screen
+  result = math.max(min, math.min(result, total - 4))
+
+  return result
+end
+
 return M
