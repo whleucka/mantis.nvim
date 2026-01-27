@@ -34,7 +34,8 @@ function M.get_summary_width()
 
   -- Remaining space for summary
   local summary_width = width - overhead - fixed_width
-  return math.max(20, summary_width)  -- minimum 20 chars
+  -- Clamp between 20 and 99 (Lua format specifier width limit)
+  return math.max(20, math.min(99, summary_width))
 end
 
 function M.get_help()
@@ -267,8 +268,8 @@ function M.prepare_node(node, line, component)
       line:append(severity)
     end
 
-    -- Summary column uses dynamic width
-    local summary_width = columns.summary or M.get_summary_width()
+    -- Summary column uses dynamic width (capped at 99 for Lua format limit)
+    local summary_width = math.min(columns.summary or M.get_summary_width(), 99)
     local summary = n.text(string.format("%-" .. summary_width .. "s ",
       util.truncate(issue.summary, summary_width)))
     line:append(summary)
