@@ -115,7 +115,7 @@ local function render_vertical(groups)
   return lines, highlights
 end
 
-local function render_horizontal(groups, max_cols)
+local function render_horizontal(groups, max_cols, popup_width)
   local lines = {}
   local highlights = {}
   local COLUMN_GAP = 3
@@ -148,6 +148,19 @@ local function render_horizontal(groups, max_cols)
       group.col_width = key_w + 1 + label_w
     end
 
+    -- Calculate total row width for centering
+    local row_content_width = 0
+    for i, group in ipairs(row_groups) do
+      row_content_width = row_content_width + group.col_width
+      if i < #row_groups then
+        row_content_width = row_content_width + COLUMN_GAP
+      end
+    end
+
+    -- Calculate left padding to center the row
+    local left_pad = math.max(0, math.floor((popup_width - row_content_width) / 2))
+    local padding = string.rep(" ", left_pad)
+
     -- Max rows in this section
     local max_rows = 0
     for _, group in ipairs(row_groups) do
@@ -157,14 +170,14 @@ local function render_horizontal(groups, max_cols)
     -- Header line
     local header_parts = {}
     local header_hl_positions = {}
-    local pos = 1
+    local pos = left_pad
     for _, group in ipairs(row_groups) do
       local title = string.format("%-" .. group.col_width .. "s", group.title)
       table.insert(header_parts, title)
       table.insert(header_hl_positions, { start = pos, finish = pos + #group.title })
       pos = pos + group.col_width + COLUMN_GAP
     end
-    local header_line = " " .. table.concat(header_parts, string.rep(" ", COLUMN_GAP))
+    local header_line = padding .. table.concat(header_parts, string.rep(" ", COLUMN_GAP))
     local line_num = #lines + 1
     table.insert(lines, header_line)
     for _, hl_pos in ipairs(header_hl_positions) do
@@ -176,13 +189,13 @@ local function render_horizontal(groups, max_cols)
     for _, group in ipairs(row_groups) do
       table.insert(sep_parts, string.rep("-", group.col_width))
     end
-    table.insert(lines, " " .. table.concat(sep_parts, string.rep(" ", COLUMN_GAP)))
+    table.insert(lines, padding .. table.concat(sep_parts, string.rep(" ", COLUMN_GAP)))
 
     -- Data rows
     for row = 1, max_rows do
       local cols = {}
       local key_hl_positions = {}
-      pos = 1
+      pos = left_pad
       for _, group in ipairs(row_groups) do
         local item = group.items[row]
         if item then
@@ -194,7 +207,7 @@ local function render_horizontal(groups, max_cols)
         end
         pos = pos + group.col_width + COLUMN_GAP
       end
-      local data_line = " " .. table.concat(cols, string.rep(" ", COLUMN_GAP))
+      local data_line = padding .. table.concat(cols, string.rep(" ", COLUMN_GAP))
       line_num = #lines + 1
       table.insert(lines, data_line)
       for _, hl_pos in ipairs(key_hl_positions) do
@@ -230,26 +243,33 @@ function M.render()
 
   local lines, highlights
   local popup_width, popup_height
+  local max_cols
 
+  -- Determine popup_width and layout first
   if screen_width >= total_horizontal_width then
     -- Full horizontal layout (5 columns)
-    lines, highlights = render_horizontal(groups, 5)
+    max_cols = 5
     popup_width = math.min(total_horizontal_width, screen_width - 4)
-    popup_height = #lines + 2
   elseif screen_width >= math.floor(total_horizontal_width * 0.6) then
     -- 3 columns layout
-    lines, highlights = render_horizontal(groups, 3)
+    max_cols = 3
     popup_width = math.min(math.floor(screen_width * 0.9), screen_width - 4)
-    popup_height = #lines + 2
   elseif screen_width >= 50 then
     -- 2 columns layout
-    lines, highlights = render_horizontal(groups, 2)
+    max_cols = 2
     popup_width = math.min(math.floor(screen_width * 0.9), screen_width - 4)
-    popup_height = #lines + 2
   else
     -- Vertical layout for very narrow screens
-    lines, highlights = render_vertical(groups)
+    max_cols = 0
     popup_width = math.min(40, screen_width - 4)
+  end
+
+  -- Now render with the calculated popup_width
+  if max_cols > 0 then
+    lines, highlights = render_horizontal(groups, max_cols, popup_width)
+    popup_height = #lines + 2
+  else
+    lines, highlights = render_vertical(groups)
     popup_height = math.min(#lines + 2, screen_height - 4)
   end
 
