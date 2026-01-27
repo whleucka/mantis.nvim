@@ -5,6 +5,7 @@ local event = require("nui.utils.autocmd").event
 local config = require("mantis.config")
 local state = require("mantis.state")
 local helper = require("mantis.add_note.helper")
+local util = require("mantis.util")
 
 function M.render(issue_id, refresh_view)
   local options = config.options.add_note
@@ -60,7 +61,9 @@ function M.render(issue_id, refresh_view)
           local data = {
             text = note_text,
           }
-          local ok, _ = state.api:create_issue_note(issue_id, data)
+          local ok, _ = util.with_loading("Adding note", function()
+            return state.api:create_issue_note(issue_id, data)
+          end)
           if ok then
             vim.notify("Note added successfully.")
             refresh_view()
@@ -87,7 +90,9 @@ function M.render(issue_id, refresh_view)
                 duration = duration,
               },
             }
-            local ok, _ = state.api:create_issue_note(issue_id, data)
+            local ok, _ = util.with_loading("Adding note", function()
+              return state.api:create_issue_note(issue_id, data)
+            end)
             if ok then
               vim.notify("Note added successfully with time tracking.")
               refresh_view()
@@ -108,7 +113,9 @@ function M.render(issue_id, refresh_view)
               duration = duration,
             },
           }
-          local ok, _ = state.api:create_issue_note(issue_id, data)
+          local ok, _ = util.with_loading("Adding note", function()
+            return state.api:create_issue_note(issue_id, data)
+          end)
           if ok then
             vim.notify("Note added successfully with time tracking.")
             refresh_view()

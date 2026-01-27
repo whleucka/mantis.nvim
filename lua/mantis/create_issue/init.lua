@@ -4,7 +4,7 @@ local ui = require("mantis.ui")
 local n = require("nui-components")
 local state = require("mantis.state")
 local config = require("mantis.config")
-local helper = require("mantis.create_issue.helper")
+local util = require("mantis.util")
 
 function M.render(project_id)
   local options = config.options.create_issue
@@ -34,12 +34,12 @@ function M.render(project_id)
   local function get_users()
     local pid = signal.project_id:get_value()
     local nodes = {}
-    local ok, res = state.api:get_project_users(pid)
+    local ok, users = state.get_project_users(pid)
     if not ok then
       return nodes
     end
 
-    for i, user in ipairs(res.users) do
+    for i, user in ipairs(users) do
       if i == 1 then
         signal.handler_name = user.name
       end
@@ -52,7 +52,7 @@ function M.render(project_id)
   local function get_categories()
     local pid = signal.project_id:get_value()
     local nodes = {}
-    local ok, categories = state.api:get_project_categories(pid)
+    local ok, categories = state.get_project_categories(pid)
     if not ok then
       return nodes
     end
@@ -153,7 +153,9 @@ function M.render(project_id)
                 name = s.reproducibility_name
               }
             }
-            local ok, _ = state.api:create_issue(data)
+            local ok, _ = util.with_loading("Creating issue", function()
+              return state.api:create_issue(data)
+            end)
             if not ok then
               vim.notify("Could not create issue", vim.log.levels.ERROR)
               renderer:close()

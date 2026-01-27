@@ -98,4 +98,32 @@ function M.open_url(url)
   vim.system(cmd, { detach = true })
 end
 
+--- Show a loading message and force redraw
+---@param message string The loading message to display
+function M.loading(message)
+  vim.api.nvim_echo({{ message .. "...", "Comment" }}, false, {})
+  vim.cmd('redraw')
+end
+
+--- Clear the command line (remove loading message)
+function M.loading_done()
+  vim.api.nvim_echo({{"", ""}}, false, {})
+  vim.cmd('redraw')
+end
+
+--- Execute a function with a loading indicator
+---@param message string The loading message to display
+---@param fn function The function to execute
+---@return any ... Returns whatever the function returns
+function M.with_loading(message, fn)
+  M.loading(message)
+  local results = { pcall(fn) }
+  M.loading_done()
+  local ok = table.remove(results, 1)
+  if not ok then
+    error(results[1])
+  end
+  return unpack(results)
+end
+
 return M

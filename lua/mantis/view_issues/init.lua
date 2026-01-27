@@ -76,7 +76,9 @@ function M.render()
   end
 
   local function load_issues()
-    local ok, res = fetch_issues(state.page)
+    local ok, res = util.with_loading("Loading issues", function()
+      return fetch_issues(state.page)
+    end)
     if ok and res and res.issues then
       issues_cache = res.issues
       build_signal_nodes()
@@ -84,7 +86,9 @@ function M.render()
   end
 
   local function update_issue(issue_id, issue_data)
-    local ok, res = state.api:update_issue(issue_id, issue_data)
+    local ok, res = util.with_loading("Updating issue", function()
+      return state.api:update_issue(issue_id, issue_data)
+    end)
     if ok and res and #res.issues > 0 then
       update_cache_issue(res.issues[1])
     end
@@ -100,7 +104,7 @@ function M.render()
     }
 
     if property_name == 'category' then
-      local ok, categories = state.api:get_project_categories(issue.project.id)
+      local ok, categories = state.get_project_categories(issue.project.id)
       if not ok then
         return
       end
@@ -173,7 +177,9 @@ function M.render()
       return
     end
 
-    local ok, res = fetch_issues(new_page)
+    local ok, res = util.with_loading("Loading page " .. new_page, function()
+      return fetch_issues(new_page)
+    end)
     if ok and res and res.issues and #res.issues > 0 then
       state.page = new_page
       issues_cache = res.issues
@@ -187,7 +193,9 @@ function M.render()
     vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue_id .. '? (y/n) ', default = 'n' },
       function(input)
         if input and input:lower() == 'y' then
-          local ok, _ = state.api:delete_issue(issue_id)
+          local ok, _ = util.with_loading("Deleting issue", function()
+            return state.api:delete_issue(issue_id)
+          end)
           if ok then
             vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
             remove_cache_issue(issue_id)
@@ -215,12 +223,12 @@ function M.render()
   end
 
   local function assign_user(project_id, issue_id)
-    local ok, users_data = state.api:get_project_users(project_id)
+    local ok, users = state.get_project_users(project_id)
     if not ok then
       return
     end
 
-    vim.ui.select(users_data.users, {
+    vim.ui.select(users, {
       prompt = "Select a user to assign",
       format_item = function(item)
         return item.name
