@@ -53,7 +53,7 @@ M.options = {
       -- window size (supports percentages like "90%" or absolute numbers)
       width = "90%",
       height = "80%",
-      max_width = 200,
+      max_width = 180,
       max_height = 50,
       -- column widths (summary is calculated dynamically to fill remaining space)
       columns = {
