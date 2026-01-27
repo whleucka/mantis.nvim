@@ -568,6 +568,7 @@ function M.render()
 
   local body = function()
     local issue_table
+    local current_node_type = nil  -- Track current node type for highlighting
     local api_name = (state.api.name and state.api.name) or state.api.url
 
     issue_table = n.tree({
@@ -596,6 +597,7 @@ function M.render()
       end,
       prepare_node = helper.prepare_node,
       on_change = function(node, component)
+        current_node_type = node and node.type or nil
         if node and node.type == 'issue' then
           signal.selected = node.issue
         end
@@ -610,11 +612,13 @@ function M.render()
 
         local function update_selection_indicator()
           vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
-          local cursor = vim.api.nvim_win_get_cursor(0)
-          local line = cursor[1] - 1
-          vim.api.nvim_buf_set_extmark(bufnr, ns_id, line, 0, {
-            line_hl_group = "MantisSelection",
-          })
+          if current_node_type == 'issue' then
+            local cursor = vim.api.nvim_win_get_cursor(0)
+            local line = cursor[1] - 1
+            vim.api.nvim_buf_set_extmark(bufnr, ns_id, line, 0, {
+              line_hl_group = "MantisSelection",
+            })
+          end
         end
 
         update_selection_indicator()
