@@ -44,16 +44,17 @@ M.options = {
     default_filter = 'all', -- default filter: 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
     ui = {
-      -- column width
-      width = 150,
-      height = 50,
+      -- window size (supports percentages like "90%" or absolute numbers)
+      width = "90%",
+      height = "80%",
+      -- column widths (summary is calculated dynamically to fill remaining space)
       columns = {
         priority = 1,
         id = 7,
         severity = 10,
         status = 24,
         category = 12,
-        summary = 69,
+        summary = nil, -- auto-calculated based on available width
         updated = 10
       }
     },

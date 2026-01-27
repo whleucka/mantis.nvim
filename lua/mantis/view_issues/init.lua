@@ -12,6 +12,15 @@ local function get_current_filter()
   return state.current_filter or options.default_filter or 'all'
 end
 
+-- Convert percentage string or number to actual dimension
+local function resolve_dimension(value, total)
+  if type(value) == "string" and value:match("%%$") then
+    local pct = tonumber(value:match("^(%d+)")) or 80
+    return math.floor(total * pct / 100)
+  end
+  return value
+end
+
 function M.render()
   local options = config.options.view_issues
 
@@ -24,8 +33,8 @@ function M.render()
   })
 
   local renderer = n.create_renderer({
-    width = options.ui.width,
-    height = options.ui.height,
+    width = resolve_dimension(options.ui.width, vim.o.columns),
+    height = resolve_dimension(options.ui.height, vim.o.lines),
   })
 
   local issues_cache = {}

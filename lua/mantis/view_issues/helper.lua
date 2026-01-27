@@ -6,6 +6,37 @@ local util = require("mantis.util")
 local config = require("mantis.config")
 local options = config.options.view_issues
 
+-- Calculate the effective window width from config (handles percentages)
+local function get_effective_width()
+  local width = options.ui.width
+  if type(width) == "string" and width:match("%%$") then
+    local pct = tonumber(width:match("^(%d+)")) or 90
+    return math.floor(vim.o.columns * pct / 100)
+  end
+  return width or 150
+end
+
+-- Calculate summary column width based on available space
+function M.get_summary_width()
+  local columns = options.ui.columns
+  local width = get_effective_width()
+
+  -- Fixed overhead: checkbox (4) + tree prefix (4) + border (4) + padding
+  local overhead = 13
+
+  -- Sum of fixed column widths (each has 1 space after)
+  local fixed_width = 0
+  for col, w in pairs(columns) do
+    if col ~= "summary" and w then
+      fixed_width = fixed_width + w + 1  -- +1 for space after each column
+    end
+  end
+
+  -- Remaining space for summary
+  local summary_width = width - overhead - fixed_width
+  return math.max(20, summary_width)  -- minimum 20 chars
+end
+
 function M.get_help()
   local keymap = options.keymap
   local COLUMN_GAP = 2
@@ -159,7 +190,8 @@ function M.prepare_node(node, line, component)
 
   if type == 'empty' then
     local message = "🎉 There are currently no issues"
-    local padding = math.floor((options.ui.width - #message) / 2)
+    local width = get_effective_width()
+    local padding = math.floor((width - #message) / 2)
     line:append(n.text(string.rep(" ", padding) .. message, "Comment"))
   elseif type == 'project' then
     local project = node.project
@@ -235,11 +267,11 @@ function M.prepare_node(node, line, component)
       line:append(severity)
     end
 
-    if columns.summary then
-      local summary = n.text(string.format("%-" .. columns.summary .. "s ",
-        util.truncate(issue.summary, columns.summary)))
-      line:append(summary)
-    end
+    -- Summary column uses dynamic width
+    local summary_width = columns.summary or M.get_summary_width()
+    local summary = n.text(string.format("%-" .. summary_width .. "s ",
+      util.truncate(issue.summary, summary_width)))
+    line:append(summary)
 
     if columns.updated then
       local updated_text = M.time_ago(issue.updated_at)
