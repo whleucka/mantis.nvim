@@ -3,7 +3,6 @@ local M = {}
 local Popup = require("nui.popup")
 local event = require("nui.utils.autocmd").event
 local config = require("mantis.config")
-local options = config.options.view_issue
 local state = require("mantis.state")
 local helper = require("mantis.view_issue.helper")
 local add_note = require("mantis.add_note")
@@ -21,9 +20,9 @@ local function render_content(popup, issue, width)
     end
   end
 
-  vim.api.nvim_buf_set_option(popup.bufnr, "modifiable", true)
+  vim.bo[popup.bufnr].modifiable = true
   vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(popup.bufnr, "modifiable", false)
+  vim.bo[popup.bufnr].modifiable = false
 
   for _, hl_data in ipairs(highlights) do
     vim.api.nvim_buf_add_highlight(popup.bufnr, -1, hl_data.hl, hl_data.line - 1, 0, -1)
@@ -39,6 +38,7 @@ local function fetch_issue(issue_id)
 end
 
 function M.render(issue_id)
+  local options = config.options.view_issue
   local popup_width = options.ui.width
   local popup_height = options.ui.height
 
