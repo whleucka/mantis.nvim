@@ -137,7 +137,7 @@ local function render_horizontal(groups, max_cols, popup_width)
 
     -- Calculate widths for each group in this row
     for _, group in ipairs(row_groups) do
-      local key_w = #group.title
+      local key_w = 0
       local label_w = 0
       for _, item in ipairs(group.items) do
         key_w = math.max(key_w, #item.key)
@@ -145,7 +145,9 @@ local function render_horizontal(groups, max_cols, popup_width)
       end
       group.key_width = key_w
       group.label_width = label_w
-      group.col_width = key_w + 1 + label_w
+      -- Column width is the wider of: title or (key + space + label)
+      local content_width = key_w + 1 + label_w
+      group.col_width = math.max(#group.title, content_width)
     end
 
     -- Calculate total row width for centering
