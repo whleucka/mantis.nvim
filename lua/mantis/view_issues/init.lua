@@ -25,7 +25,6 @@ function M.render()
   local options = config.options.view_issues
 
   local signal = n.create_signal({
-    show_help = false,
     selected = nil,
     mode = get_current_filter(),
     grouped = state.grouped,
@@ -691,7 +690,8 @@ function M.render()
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.help, function()
-          signal.show_help = not signal.show_help:get_value()
+          local view_help = require("mantis.view_help")
+          view_help.render()
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.toggle_group, function()
@@ -759,13 +759,7 @@ function M.render()
       end,
     })
 
-    local help = n.paragraph({
-      hidden = signal.show_help:negate(),
-      lines = helper.get_help(),
-      align = "center"
-    })
-
-    return n.rows(issue_table, help)
+    return issue_table
   end
 
   load_issues(false)  -- no loading indicator on initial load
