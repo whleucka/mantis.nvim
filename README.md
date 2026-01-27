@@ -18,6 +18,14 @@
 - Update status, priority, severity, and category
 - Add notes to existing issues
 - Toggle grouped/ungrouped view
+- Default filter setting (all, assigned, reported, monitored, unassigned)
+
+### Batch Operations
+
+- Select individual issues or select all on current page
+- Batch change status, priority, severity, category
+- Batch assign users to multiple issues
+- Batch delete issues
 
 ### Create Issue
 
@@ -123,8 +131,8 @@ require('mantis').setup({
   hosts = {},
   add_note = {
     ui = {
-      width = 80,
-      height = 15,
+      width = 60,
+      height = 10,
     },
     keymap = {
       quit = "q",
@@ -134,7 +142,7 @@ require('mantis').setup({
   create_issue = {
     ui = {
       width = 80,
-      height = 15,
+      height = 21,
     },
     keymap = {
       quit = "q",
@@ -149,6 +157,7 @@ require('mantis').setup({
     keymap = {
       quit = "q",
       refresh = "r",
+      add_note = "N",
       scroll_down = "j",
       scroll_up = "k",
       page_down = "<C-d>",
@@ -158,6 +167,7 @@ require('mantis').setup({
     }
   },
   view_issues = {
+    default_filter = 'all', -- 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
     ui = {
       width = 150,
@@ -190,12 +200,24 @@ require('mantis').setup({
       help = "?",
       refresh = "r",
       quit = "q",
+      -- Selection
+      toggle_select = "<Space>",
+      select_all = "<C-a>",
+      clear_selection = "<C-x>",
+      -- Batch operations
+      batch_status = "bs",
+      batch_priority = "bp",
+      batch_severity = "bv",
+      batch_category = "bc",
+      batch_assign = "ba",
+      batch_delete = "bD",
     }
   },
   issue_status_options = {},
   issue_severity_options = {},
   issue_priority_options = {},
   issue_resolution_options = {},
+  issue_reproducibility_options = {},
   issue_filter_options = {
     'all',
     'assigned',
@@ -208,8 +230,8 @@ require('mantis').setup({
     immediate = "🔥",
     urgent    = "⚠️",
     high      = "🔺",
-    normal    = "🔵",
     low       = "🔻",
+    normal    = "🔵",
     default   = "🟣",
   },
 }
@@ -222,6 +244,7 @@ require('mantis').setup({
 | Command | Description |
 |---------|-------------|
 | `:MantisIssues` | Open the issues view |
+| `:MantisIssue <id>` | View a specific issue by ID |
 | `:MantisSelectHost` | Switch between configured hosts |
 
 ### Keymaps (Issues View)
@@ -247,6 +270,25 @@ require('mantis').setup({
 | `H` | Previous page |
 | `q` | Quit |
 
+#### Selection
+
+| Key | Action |
+|-----|--------|
+| `<Space>` | Toggle select issue |
+| `<C-a>` | Select all issues on page |
+| `<C-x>` | Clear selection |
+
+#### Batch Operations
+
+| Key | Action |
+|-----|--------|
+| `bs` | Batch change status |
+| `bp` | Batch change priority |
+| `bv` | Batch change severity |
+| `bc` | Batch change category |
+| `ba` | Batch assign user |
+| `bD` | Batch delete issues |
+
 ### Keymaps (Issue View)
 
 | Key | Action |
@@ -254,6 +296,7 @@ require('mantis').setup({
 | `j` / `k` | Scroll down/up |
 | `<C-d>` / `<C-u>` | Page down/up |
 | `gg` / `G` | Go to top/bottom |
+| `N` | Add note |
 | `r` | Refresh |
 | `q` | Quit |
 
