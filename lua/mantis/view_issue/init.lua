@@ -6,6 +6,7 @@ local config = require("mantis.config")
 local state = require("mantis.state")
 local helper = require("mantis.view_issue.helper")
 local add_note = require("mantis.add_note")
+local util = require("mantis.util")
 
 local function render_content(popup, issue, width)
   local formatted = helper.format_issue(issue, width)
@@ -30,7 +31,9 @@ local function render_content(popup, issue, width)
 end
 
 local function fetch_issue(issue_id)
-  local ok, res = state.api:get_issue(issue_id)
+  local ok, res = util.with_loading("Loading issue #" .. issue_id, function()
+    return state.api:get_issue(issue_id)
+  end)
   if ok and res and res.issues and res.issues[1] then
     return res.issues[1]
   end

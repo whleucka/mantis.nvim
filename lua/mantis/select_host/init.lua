@@ -9,7 +9,7 @@ local function set_host(host)
   state.api = api.new(host)
   state.clear_caches() -- clear project caches when switching hosts
   if state.api then
-    -- load the mantis statuses, severities, priorities ... 
+    -- load the mantis statuses, severities, priorities ...
     local ok, config_data = state.api:get_config({ "status_enum_string", "severity_enum_string", "priority_enum_string", "resolution_enum_string", "reproducibility_enum_string" })
     if ok and config_data and config_data.configs then
       for _, c in ipairs(config_data.configs) do

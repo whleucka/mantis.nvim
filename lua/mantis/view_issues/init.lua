@@ -75,10 +75,15 @@ function M.render()
     return ok, res
   end
 
-  local function load_issues()
-    local ok, res = util.with_loading("Loading issues", function()
-      return fetch_issues(state.page)
-    end)
+  local function load_issues(show_loading)
+    local ok, res
+    if show_loading then
+      ok, res = util.with_loading("Loading issues", function()
+        return fetch_issues(state.page)
+      end)
+    else
+      ok, res = fetch_issues(state.page)
+    end
     if ok and res and res.issues then
       issues_cache = res.issues
       build_signal_nodes()
@@ -86,9 +91,7 @@ function M.render()
   end
 
   local function update_issue(issue_id, issue_data)
-    local ok, res = util.with_loading("Updating issue", function()
-      return state.api:update_issue(issue_id, issue_data)
-    end)
+    local ok, res = state.api:update_issue(issue_id, issue_data)
     if ok and res and #res.issues > 0 then
       update_cache_issue(res.issues[1])
     end
@@ -193,9 +196,7 @@ function M.render()
     vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue_id .. '? (y/n) ', default = 'n' },
       function(input)
         if input and input:lower() == 'y' then
-          local ok, _ = util.with_loading("Deleting issue", function()
-            return state.api:delete_issue(issue_id)
-          end)
+          local ok, _ = state.api:delete_issue(issue_id)
           if ok then
             vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
             remove_cache_issue(issue_id)
@@ -218,7 +219,7 @@ function M.render()
 
       signal.mode = choice
       state.current_filter = choice
-      load_issues()
+      load_issues(false)
     end)
   end
 
@@ -404,7 +405,7 @@ function M.render()
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.refresh, function()
-          load_issues()
+          load_issues(true)
           vim.notify("Issues refreshed.", vim.log.levels.INFO)
         end, { buffer = true, nowait = true })
 
@@ -431,7 +432,7 @@ function M.render()
     return n.rows(issue_table, help)
   end
 
-  load_issues()
+  load_issues(false)  -- no loading indicator on initial load
   renderer:render(body)
 end
 
