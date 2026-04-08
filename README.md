@@ -8,17 +8,20 @@
 - Fully reactive UI powered by **nui-components**
 - Cross-platform (Linux, macOS, Windows)
 
-### Issues
+### Issues List
 
-- Configurable issue properties
-- Optional pagination for large result sets
+- Configurable issue properties and column widths
+- Pagination for large result sets
+- Filter by all, assigned, reported, monitored, or unassigned issues
 - Assign issues to users
 - Create and delete issues
 - Open issues directly in your browser
-- Update status, priority, severity, and category
+- Update status, priority, severity, category, and summary
 - Add notes to existing issues
-- Toggle grouped/ungrouped view
-- Default filter setting (all, assigned, reported, monitored, unassigned)
+- Monitor issues
+- Toggle grouped/ungrouped view (group by project)
+- Priority emojis with customizable icons
+- Selection and batch operations
 
 ### Batch Operations
 
@@ -29,14 +32,15 @@
 
 ### Create Issue
 
-- Assign users
-- Set category
+- Assign user
+- Set category, priority, severity, and reproducibility
 - Add summary and description
 
 ### View Issue
 
-- Inspect full issue details
-- Browse issue notes
+- Inspect full issue details including custom fields
+- Browse and add notes with optional time tracking
+- Edit and delete notes
 - Review issue history
 
 ## Requirements
@@ -100,7 +104,7 @@ To use `mantis.nvim`, you need to configure your MantisBT hosts. Each host entry
 ### Getting an API Token
 
 1. Log in to your MantisBT instance
-2. Go to **My Account** → **API Tokens**
+2. Go to **My Account** -> **API Tokens**
 3. Create a new token with appropriate permissions
 4. Copy the token and store it securely
 
@@ -133,31 +137,39 @@ require('mantis').setup({
     ui = {
       width = 60,
       height = 10,
+      max_width = 80,
+      max_height = 20,
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   create_issue = {
     ui = {
       width = 80,
       height = 21,
+      max_width = 120,
+      max_height = 30,
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   view_issue = {
     ui = {
       width = 80,
       height = 30,
+      max_width = 120,
+      max_height = 40,
     },
     keymap = {
       quit = "q",
       refresh = "r",
       add_note = "N",
+      edit_note = "en",
+      delete_note = "dn",
       scroll_down = "j",
       scroll_up = "k",
       page_down = "<C-d>",
@@ -170,15 +182,19 @@ require('mantis').setup({
     default_filter = 'all', -- 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
     ui = {
-      width = 150,
-      height = 50,
+      -- window size (supports percentages like "90%" or absolute numbers)
+      width = "90%",
+      height = "80%",
+      max_width = 180,
+      max_height = 50,
+      -- column widths (summary is calculated dynamically to fill remaining space)
       columns = {
         priority = 1,
         id = 7,
         severity = 10,
         status = 24,
         category = 12,
-        summary = 69,
+        summary = nil, -- auto-calculated based on available width
         updated = 10
       }
     },
@@ -192,11 +208,12 @@ require('mantis').setup({
       assign_issue = "a",
       change_summary = "S",
       change_status = "s",
-      change_severity = "v",
+      change_severity = "V",
       change_priority = "p",
       change_category = "c",
-      filter = "f",
-      toggle_group = "g",
+      monitor = "m",
+      filter = "F",
+      toggle_group = "<C-g>",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -213,11 +230,6 @@ require('mantis').setup({
       batch_delete = "bD",
     }
   },
-  issue_status_options = {},
-  issue_severity_options = {},
-  issue_priority_options = {},
-  issue_resolution_options = {},
-  issue_reproducibility_options = {},
   issue_filter_options = {
     'all',
     'assigned',
@@ -260,11 +272,12 @@ require('mantis').setup({
 | `a` | Assign issue |
 | `s` | Change status |
 | `p` | Change priority |
-| `v` | Change severity |
+| `V` | Change severity |
 | `c` | Change category |
 | `S` | Change summary |
-| `f` | Filter issues |
-| `g` | Toggle group by project |
+| `m` | Monitor issue |
+| `F` | Filter issues |
+| `<C-g>` | Toggle group by project |
 | `r` | Refresh |
 | `L` | Next page |
 | `H` | Previous page |
@@ -297,7 +310,23 @@ require('mantis').setup({
 | `<C-d>` / `<C-u>` | Page down/up |
 | `gg` / `G` | Go to top/bottom |
 | `N` | Add note |
+| `en` | Edit note |
+| `dn` | Delete note |
 | `r` | Refresh |
+| `q` | Quit |
+
+### Keymaps (Add Note / Edit Note)
+
+| Key | Action |
+|-----|--------|
+| `<M-CR>` | Submit |
+| `q` | Quit |
+
+### Keymaps (Create Issue)
+
+| Key | Action |
+|-----|--------|
+| `<M-CR>` | Submit |
 | `q` | Quit |
 
 ## Troubleshooting
@@ -328,6 +357,7 @@ nvim
 <img width="1740" height="963" alt="image" src="https://github.com/user-attachments/assets/50d83bcb-5e80-4874-b6a6-53d4ce19d4ec" />
 <img width="922" height="696" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
 <img width="894" height="649" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
+
 ## License
 
 MIT
