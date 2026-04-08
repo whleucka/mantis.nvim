@@ -48,7 +48,7 @@ function M.render(issue_id, refresh_view)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.submit, function()
-      local note_text = table.concat(vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false), "\n")
+      local note_text = vim.trim(table.concat(vim.api.nvim_buf_get_lines(popup.bufnr, 0, -1, false), "\n"))
 
       if note_text == "" then
         vim.notify("Note text cannot be empty.", vim.log.levels.WARN)

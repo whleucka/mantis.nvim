@@ -10,12 +10,15 @@ function M.wrap_text(text, width)
   if not text or text == "" then return {} end
 
   local lines = {}
-  for line in text:gmatch("[^\r\n]+") do
-    if #line <= width then
-      table.insert(lines, line)
+  for _, raw_line in ipairs(vim.split(text, "\n", { plain = true })) do
+    raw_line = raw_line:gsub("\r$", "")
+    if raw_line == "" then
+      table.insert(lines, "")
+    elseif #raw_line <= width then
+      table.insert(lines, raw_line)
     else
       local current = ""
-      for word in line:gmatch("%S+") do
+      for word in raw_line:gmatch("%S+") do
         if #current + #word + 1 <= width then
           current = current == "" and word or (current .. " " .. word)
         else
