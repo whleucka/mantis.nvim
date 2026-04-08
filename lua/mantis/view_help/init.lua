@@ -318,7 +318,7 @@ function M.render()
   popup:map("n", keymap.help, close, { noremap = true, silent = true })
   popup:map("n", "<Esc>", close, { noremap = true, silent = true })
 
-  popup:on(event.BufLeave, function()
+  popup:on(event.WinClosed, function()
     popup:unmount()
   end)
 end

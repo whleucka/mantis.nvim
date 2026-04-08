@@ -33,14 +33,10 @@ function M.render(issue_id, refresh_view)
     win_options = { wrap = true },
   })
 
-  -- mount/unmount logic
-  local in_prompt = false
   popup:mount()
   vim.cmd("startinsert")
-  popup:on(event.BufLeave, function()
-    if not in_prompt then
-      popup:unmount()
-    end
+  popup:on(event.WinClosed, function()
+    popup:unmount()
   end)
 
   -- keymaps
@@ -72,19 +68,15 @@ function M.render(issue_id, refresh_view)
         end
       end
 
-      in_prompt = true
       vim.ui.input({ prompt = "Track time? (y/n) ", default = "n" }, function(input)
-        in_prompt = false
         if not input or input:lower() == "n" then
           submit_note({ text = note_text })
           return
         end
 
         if input:lower() == "y" then
-          in_prompt = true
-          vim.ui.input({ prompt = "Enter time (HH:MM) " }, function(time_input)
-            in_prompt = false
-            if not time_input then return end
+              vim.ui.input({ prompt = "Enter time (HH:MM) " }, function(time_input)
+                if not time_input then return end
             local is_valid, duration = helper.validate_time(time_input)
             if not is_valid then
               vim.notify("Invalid time format.", vim.log.levels.ERROR)

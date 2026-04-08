@@ -80,12 +80,9 @@ function M.render(issue_id)
     },
   })
 
-  local suppress_leave = false
   popup:mount()
-  popup:on(event.BufLeave, function()
-    if not suppress_leave then
-      popup:unmount()
-    end
+  popup:on(event.WinClosed, function()
+    popup:unmount()
   end)
 
   render_content(popup, issue, popup_width)
@@ -109,14 +106,12 @@ function M.render(issue_id)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.add_note, function()
-      suppress_leave = true
       add_note.render(issue_id, function()
         local refreshed_issue = fetch_issue(issue_id)
         if refreshed_issue then
           issue = refreshed_issue
           render_content(popup, issue, popup_width)
         end
-        suppress_leave = false
       end)
     end, { noremap = true, silent = true })
 
@@ -126,7 +121,6 @@ function M.render(issue_id)
         return
       end
 
-      suppress_leave = true
       vim.ui.select(issue.notes, {
         prompt = "Select a note to delete",
         format_item = function(note)
@@ -139,7 +133,6 @@ function M.render(issue_id)
         end,
       }, function(note)
         if not note then
-          suppress_leave = false
           return
         end
 
@@ -147,7 +140,6 @@ function M.render(issue_id)
           prompt = "Delete this note? (y/n) ",
           default = "n",
         }, function(input)
-          suppress_leave = false
           if not input or input:lower() ~= "y" then
             vim.notify("Deletion cancelled.", vim.log.levels.INFO)
             return
@@ -174,7 +166,6 @@ function M.render(issue_id)
         return
       end
 
-      suppress_leave = true
       vim.ui.select(issue.notes, {
         prompt = "Select a note to edit",
         format_item = function(note)
@@ -187,7 +178,6 @@ function M.render(issue_id)
         end,
       }, function(note)
         if not note then
-          suppress_leave = false
           return
         end
 
@@ -223,14 +213,12 @@ function M.render(issue_id)
         vim.api.nvim_buf_set_lines(edit_popup.bufnr, 0, -1, false, note_lines)
         vim.cmd("startinsert")
 
-        edit_popup:on(event.BufLeave, function()
+        edit_popup:on(event.WinClosed, function()
           edit_popup:unmount()
-          suppress_leave = false
         end)
 
         edit_popup:map("n", note_opts.keymap.quit, function()
           edit_popup:unmount()
-          suppress_leave = false
         end, { noremap = true, silent = true })
 
         edit_popup:map("n", note_opts.keymap.submit, function()
@@ -244,7 +232,6 @@ function M.render(issue_id)
           if ok then
             vim.notify("Note updated.", vim.log.levels.INFO)
             edit_popup:unmount()
-            suppress_leave = false
             local refreshed_issue = fetch_issue(issue_id)
             if refreshed_issue then
               issue = refreshed_issue
