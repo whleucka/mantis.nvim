@@ -22,6 +22,7 @@
 ---@field create_issue_note fun(self, issue_id: number, data: table): table
 ---@field delete_issue_note fun(self, issue_id: number, note_id: number): nil
 ---@field monitor_issue fun(self, issue_id: number): table
+---@field unmonitor_issue fun(self, issue_id: number, user_id: number): nil
 ---@field add_tags_to_issue fun(self, issue_id: number, data: table): table
 ---@field remove_tags_from_issue fun(self, issue_id: number, tag_id: number): nil
 ---@field add_issue_relationship fun(self, issue_id: number, data: table): table
@@ -289,6 +290,10 @@ end
 
 function M:monitor_issue(issue_id)
   return self:call_api('issues/' .. issue_id .. '/monitors', 'POST')
+end
+
+function M:unmonitor_issue(issue_id, user_id)
+  return self:call_api('issues/' .. issue_id .. '/monitors/' .. user_id, 'DELETE')
 end
 
 function M:add_tags_to_issue(issue_id, data)

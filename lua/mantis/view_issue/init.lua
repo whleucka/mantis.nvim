@@ -60,7 +60,7 @@ function M.render(issue_id)
       text = {
         top = " Issue #" .. issue_id .. " ",
         top_align = "left",
-        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add note ",
+        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add note | " .. options.keymap.delete_note .. ": delete note ",
         bottom_align = "right",
       },
     },
@@ -117,6 +117,54 @@ function M.render(issue_id)
           render_content(popup, issue, popup_width)
         end
         suppress_leave = false
+      end)
+    end, { noremap = true, silent = true })
+
+    popup:map("n", keymap.delete_note, function()
+      if not issue.notes or #issue.notes == 0 then
+        vim.notify("No notes to delete.", vim.log.levels.WARN)
+        return
+      end
+
+      suppress_leave = true
+      vim.ui.select(issue.notes, {
+        prompt = "Select a note to delete",
+        format_item = function(note)
+          local reporter = note.reporter and (note.reporter.real_name or note.reporter.name) or "Unknown"
+          local preview = (note.text or ""):gsub("\n", " ")
+          if #preview > 60 then
+            preview = preview:sub(1, 57) .. "..."
+          end
+          return string.format("[%s] %s", reporter, preview)
+        end,
+      }, function(note)
+        if not note then
+          suppress_leave = false
+          return
+        end
+
+        vim.ui.input({
+          prompt = "Delete this note? (y/n) ",
+          default = "n",
+        }, function(input)
+          suppress_leave = false
+          if not input or input:lower() ~= "y" then
+            vim.notify("Deletion cancelled.", vim.log.levels.INFO)
+            return
+          end
+
+          local ok, _ = state.api:delete_issue_note(issue_id, note.id)
+          if ok then
+            vim.notify("Note deleted.", vim.log.levels.INFO)
+            local refreshed_issue = fetch_issue(issue_id)
+            if refreshed_issue then
+              issue = refreshed_issue
+              render_content(popup, issue, popup_width)
+            end
+          else
+            vim.notify("Failed to delete note.", vim.log.levels.ERROR)
+          end
+        end)
       end)
     end, { noremap = true, silent = true })
 

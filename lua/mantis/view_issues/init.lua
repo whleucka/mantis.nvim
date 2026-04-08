@@ -532,6 +532,15 @@ function M.render()
     end)
   end
 
+  local function monitor_issue(issue_id)
+    local ok, _ = state.api:monitor_issue(issue_id)
+    if ok then
+      vim.notify("Now monitoring issue #" .. issue_id, vim.log.levels.INFO)
+    else
+      vim.notify("Failed to monitor issue #" .. issue_id, vim.log.levels.ERROR)
+    end
+  end
+
   local function change_summary(issue_id, summary)
     local new_summary = vim.fn.input("New summary: ", summary)
     if not new_summary or new_summary == "" then
@@ -668,6 +677,12 @@ function M.render()
           local issue = get_selected_issue()
           if not issue then return end
           assign_user(issue.project.id, issue.id)
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.monitor, function()
+          local issue = get_selected_issue()
+          if not issue then return end
+          monitor_issue(issue.id)
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.filter, function()
