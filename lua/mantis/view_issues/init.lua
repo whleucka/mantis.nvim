@@ -15,11 +15,9 @@ end
 function M.render()
   local options = config.options.view_issues
 
-  local initial_filter = get_current_filter()
   local signal = n.create_signal({
     selected = nil,
-    mode = initial_filter,
-    active_tab = initial_filter,
+    mode = get_current_filter(),
     grouped = state.grouped,
     issue_nodes = {},
   })
@@ -572,39 +570,6 @@ function M.render()
     local current_node_type = nil  -- Track current node type for highlighting
     local api_name = state.api.name or state.api.url
 
-    local is_tab_active = n.is_active_factory(signal.active_tab)
-
-    local filter_labels = {
-      { id = "all", label = "All" },
-      { id = "assigned", label = "Assigned" },
-      { id = "reported", label = "Reported" },
-      { id = "monitored", label = "Monitored" },
-      { id = "unassigned", label = "Unassigned" },
-    }
-
-    local tab_buttons = {}
-    for i, filter in ipairs(filter_labels) do
-      if i > 1 then
-        table.insert(tab_buttons, n.gap(1))
-      end
-      table.insert(tab_buttons, n.button({
-        label = filter.label,
-        is_active = is_tab_active(filter.id),
-        on_press = function()
-          signal.active_tab = filter.id
-          signal.mode = filter.id
-          state.current_filter = filter.id
-          state.page = 1
-          load_issues(false)
-        end,
-      }))
-    end
-
-    local tab_bar = n.columns(
-      { flex = 0 },
-      unpack(tab_buttons)
-    )
-
     issue_table = n.tree({
       flex = 1,
       autofocus = true,
@@ -800,10 +765,7 @@ function M.render()
       end,
     })
 
-    return n.rows(
-      tab_bar,
-      issue_table
-    )
+    return issue_table
   end
 
   load_issues(false)  -- no loading indicator on initial load
