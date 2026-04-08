@@ -299,8 +299,8 @@ function M.render()
 
   -- Set buffer content then make readonly
   vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(popup.bufnr, "modifiable", false)
-  vim.api.nvim_buf_set_option(popup.bufnr, "buftype", "nofile")
+  vim.bo[popup.bufnr].modifiable = false
+  vim.bo[popup.bufnr].buftype = "nofile"
 
   -- Apply highlights
   local ns = vim.api.nvim_create_namespace("mantis_help")

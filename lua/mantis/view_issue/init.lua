@@ -80,9 +80,12 @@ function M.render(issue_id)
     },
   })
 
+  local suppress_leave = false
   popup:mount()
   popup:on(event.BufLeave, function()
-    popup:unmount()
+    if not suppress_leave then
+      popup:unmount()
+    end
   end)
 
   render_content(popup, issue, popup_width)
@@ -106,12 +109,14 @@ function M.render(issue_id)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.add_note, function()
+      suppress_leave = true
       add_note.render(issue_id, function()
         local refreshed_issue = fetch_issue(issue_id)
         if refreshed_issue then
           issue = refreshed_issue
           render_content(popup, issue, popup_width)
         end
+        suppress_leave = false
       end)
     end, { noremap = true, silent = true })
 

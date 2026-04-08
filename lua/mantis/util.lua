@@ -1,15 +1,23 @@
 local M = {}
 
---- Truncate a string to a maximum width with ellipsis
+--- Truncate a string to a maximum display width with ellipsis
 ---@param str string The string to truncate
----@param width number Maximum width
+---@param width number Maximum display width
 ---@return string
 function M.truncate(str, width)
   if type(str) ~= "string" then
     str = tostring(str)
   end
-  if #str <= width then return str end
-  return str:sub(1, width - 1) .. "…"
+  if vim.fn.strdisplaywidth(str) <= width then return str end
+  -- Trim characters until display width fits (accounts for multi-byte/emoji)
+  local chars = vim.fn.strcharlen(str)
+  for i = chars - 1, 0, -1 do
+    local sub = vim.fn.strcharpart(str, 0, i)
+    if vim.fn.strdisplaywidth(sub) <= width - 1 then
+      return sub .. "…"
+    end
+  end
+  return "…"
 end
 
 --- Debug print helper

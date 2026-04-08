@@ -3,7 +3,10 @@ local M = {}
 local state = require("mantis.state")
 local config = require("mantis.config")
 local api = require("mantis.api")
-local helper = require("mantis.select_host.helper")
+
+local function parse_enum(value)
+  return type(value) == "table" and value or {}
+end
 
 local function set_host(host)
   state.api = api.new(host)
@@ -14,22 +17,22 @@ local function set_host(host)
     if ok and config_data and config_data.configs then
       for _, c in ipairs(config_data.configs) do
         if c.option == "status_enum_string" then
-          config.options.issue_status_options = helper.parse_enum_table(c.value)
+          config.options.issue_status_options = parse_enum(c.value)
         elseif c.option == "severity_enum_string" then
-          config.options.issue_severity_options = helper.parse_enum_table(c.value)
+          config.options.issue_severity_options = parse_enum(c.value)
         elseif c.option == "priority_enum_string" then
-          config.options.issue_priority_options = helper.parse_enum_table(c.value)
+          config.options.issue_priority_options = parse_enum(c.value)
         elseif c.option == "resolution_enum_string" then
-          config.options.issue_resolution_options = helper.parse_enum_table(c.value)
+          config.options.issue_resolution_options = parse_enum(c.value)
         elseif c.option == "reproducibility_enum_string" then
-          config.options.issue_reproducibility_options = helper.parse_enum_table(c.value)
+          config.options.issue_reproducibility_options = parse_enum(c.value)
         end
       end
     end
   end
 end
 
-function M.render()
+function M.render(on_complete)
   local hosts = config.options.hosts
   local count = vim.tbl_count(hosts)
 
@@ -37,21 +40,23 @@ function M.render()
   if count == 1 then
     local _, host = next(hosts)
     set_host(host)
+    if on_complete then on_complete() end
     return
   end
 
-  -- sort the menu
-  table.sort(hosts, function(a, b)
-    local a_field = (a.name and a.name) or a.url
-    local b_field = (b.name and b.name) or b.url
+  -- sort a copy so we don't mutate the user's config
+  local sorted_hosts = vim.list_extend({}, hosts)
+  table.sort(sorted_hosts, function(a, b)
+    local a_field = a.name or a.url
+    local b_field = b.name or b.url
     return a_field < b_field
   end)
 
   -- select a host
-  vim.ui.select(hosts, {
+  vim.ui.select(sorted_hosts, {
     prompt = "Select a MantisBT host",
     format_item = function(item)
-      return (item.name and item.name) or item.url
+      return item.name or item.url
     end,
   }, function(choice)
     if not choice then
@@ -59,6 +64,7 @@ function M.render()
     end
 
     set_host(choice)
+    if on_complete then on_complete() end
   end)
 end
 

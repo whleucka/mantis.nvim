@@ -16,6 +16,9 @@ local function get_effective_width()
   return width or 150
 end
 
+-- Cache for created highlight groups (avoids redundant nvim_set_hl calls)
+local hl_cache = {}
+
 -- Calculate summary column width based on available space
 function M.get_summary_width()
   local columns = options.ui.columns
@@ -36,154 +39,6 @@ function M.get_summary_width()
   local summary_width = width - overhead - fixed_width
   -- Clamp between 20 and 99 (Lua format specifier width limit)
   return math.max(20, math.min(99, summary_width))
-end
-
-function M.get_help()
-  local keymap = options.keymap
-  local COLUMN_GAP = 2
-
-  -- help menu, grouped kinda like neogit
-  local groups = {
-    {
-      title = "Navigation",
-      items = {
-        { key = "next_page",  label = "Next page" },
-        { key = "prev_page",  label = "Prev page" },
-        { key = "open_issue", label = "Open issue" },
-      },
-    },
-    {
-      title = "Issues",
-      items = {
-        { key = "filter",          label = "Filter" },
-        { key = "add_note",        label = "Add note" },
-        { key = "create_issue",    label = "Create issue" },
-        { key = "delete_issue",    label = "Delete issue" },
-        { key = "assign_issue",    label = "Assign issue" },
-        { key = "change_summary",  label = "Change summary" },
-        { key = "change_status",   label = "Change status" },
-        { key = "change_severity", label = "Change severity" },
-        { key = "change_priority", label = "Change priority" },
-        { key = "change_category", label = "Change category" },
-      },
-    },
-    {
-      title = "Selection",
-      items = {
-        { key = "toggle_select",   label = "Toggle select" },
-        { key = "select_all",      label = "Select all" },
-        { key = "clear_selection", label = "Clear selection" },
-      },
-    },
-    {
-      title = "Batch Ops",
-      items = {
-        { key = "batch_status",   label = "Batch status" },
-        { key = "batch_priority", label = "Batch priority" },
-        { key = "batch_severity", label = "Batch severity" },
-        { key = "batch_category", label = "Batch category" },
-        { key = "batch_assign",   label = "Batch assign" },
-        { key = "batch_delete",   label = "Batch delete" },
-      },
-    },
-    {
-      title = "Essential",
-      items = {
-        { key = "toggle_group", label = "Toggle group" },
-        { key = "refresh",      label = "Refresh" },
-        { key = "quit",         label = "Quit" },
-      },
-    },
-  }
-
-  -- resolve key mappings
-  for _, group in ipairs(groups) do
-    local resolved = {}
-    for _, item in ipairs(group.items) do
-      local key = keymap[item.key]
-      if key then
-        table.insert(resolved, {
-          key = key,
-          label = item.label,
-        })
-      end
-    end
-    group.items = resolved
-  end
-
-  -- per-column width calculation (no gap included)
-  for _, group in ipairs(groups) do
-    local key_w   = #group.title
-    local label_w = 0
-
-    for _, item in ipairs(group.items) do
-      key_w   = math.max(key_w, #item.key)
-      label_w = math.max(label_w, #item.label)
-    end
-
-    group.key_width   = key_w
-    group.label_width = label_w
-    group.col_width   = key_w + 1 + label_w
-  end
-
-  -- max rows
-  local max_rows = 0
-  for _, group in ipairs(groups) do
-    max_rows = math.max(max_rows, #group.items)
-  end
-
-  local lines = {}
-
-  local function join_columns(cols)
-    return table.concat(cols, string.rep(" ", COLUMN_GAP))
-  end
-
-  -- header
-  do
-    local header = {}
-    for _, group in ipairs(groups) do
-      table.insert(
-        header,
-        string.format("%-" .. group.col_width .. "s", group.title)
-      )
-    end
-    table.insert(lines, n.line(n.text(join_columns(header), "Special")))
-  end
-
-  -- separator
-  do
-    local sep = {}
-    for _, group in ipairs(groups) do
-      table.insert(sep, string.rep("-", group.col_width))
-    end
-    table.insert(lines, n.line(join_columns(sep)))
-  end
-
-  -- rows
-  for row = 1, max_rows do
-    local cols = {}
-
-    for _, group in ipairs(groups) do
-      local item = group.items[row]
-      if item then
-        table.insert(
-          cols,
-          string.format(
-            "%-" .. group.key_width .. "s %-"
-            .. group.label_width .. "s",
-            item.key,
-            item.label
-          )
-        )
-      else
-        table.insert(cols, string.rep(" ", group.col_width))
-      end
-    end
-
-    table.insert(lines, n.line(join_columns(cols)))
-  end
-
-  return lines
 end
 
 function M.prepare_node(node, line, component)
@@ -223,9 +78,13 @@ function M.prepare_node(node, line, component)
       status_color = "#808080" -- fallback to gray
     end
     local status_bg = "MantisStatusBg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_bg, { bg = status_color })
     local status_fg = "MantisStatusFg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_fg, { fg = status_color })
+    if not hl_cache[status_fg] then
+      vim.api.nvim_set_hl(0, status_bg, { bg = status_color })
+      vim.api.nvim_set_hl(0, status_fg, { fg = status_color })
+      hl_cache[status_bg] = true
+      hl_cache[status_fg] = true
+    end
 
     if columns.priority then
       local priority_emojis = config.options.priority_emojis

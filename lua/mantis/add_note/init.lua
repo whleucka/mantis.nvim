@@ -34,10 +34,13 @@ function M.render(issue_id, refresh_view)
   })
 
   -- mount/unmount logic
+  local in_prompt = false
   popup:mount()
   vim.cmd("startinsert")
   popup:on(event.BufLeave, function()
-    popup:unmount()
+    if not in_prompt then
+      popup:unmount()
+    end
   end)
 
   -- keymaps
@@ -56,73 +59,44 @@ function M.render(issue_id, refresh_view)
         return
       end
 
-      vim.ui.input({ prompt = "Track time? (HH:MM) (y/n) ", default = "n" }, function(input)
+      local function submit_note(data)
+        local ok, _ = util.with_loading("Adding note", function()
+          return state.api:create_issue_note(issue_id, data)
+        end)
+        if ok then
+          vim.notify("Note added successfully.")
+          if refresh_view then refresh_view() end
+          popup:unmount()
+        else
+          vim.notify("Failed to add note.", vim.log.levels.ERROR)
+        end
+      end
+
+      in_prompt = true
+      vim.ui.input({ prompt = "Track time? (y/n) ", default = "n" }, function(input)
+        in_prompt = false
         if not input or input:lower() == "n" then
-          local data = {
-            text = note_text,
-          }
-          local ok, _ = util.with_loading("Adding note", function()
-            return state.api:create_issue_note(issue_id, data)
-          end)
-          if ok then
-            vim.notify("Note added successfully.")
-            refresh_view()
-            popup:unmount()
-          else
-            vim.notify("Failed to add note.", vim.log.levels.ERROR)
-          end
+          submit_note({ text = note_text })
           return
         end
 
         if input:lower() == "y" then
+          in_prompt = true
           vim.ui.input({ prompt = "Enter time (HH:MM) " }, function(time_input)
-            if not time_input then
-              return
-            end
+            in_prompt = false
+            if not time_input then return end
             local is_valid, duration = helper.validate_time(time_input)
             if not is_valid then
               vim.notify("Invalid time format.", vim.log.levels.ERROR)
               return
             end
-            local data = {
+            submit_note({
               text = note_text,
-              time_tracking = {
-                duration = duration,
-              },
-            }
-            local ok, _ = util.with_loading("Adding note", function()
-              return state.api:create_issue_note(issue_id, data)
-            end)
-            if ok then
-              vim.notify("Note added successfully with time tracking.")
-              refresh_view()
-              popup:unmount()
-            else
-              vim.notify("Failed to add note with time tracking.", vim.log.levels.ERROR)
-            end
+              time_tracking = { duration = duration },
+            })
           end)
         else
-          local is_valid, duration = helper.validate_time(input)
-          if not is_valid then
-            vim.notify("Invalid time format.", vim.log.levels.ERROR)
-            return
-          end
-          local data = {
-            text = note_text,
-            time_tracking = {
-              duration = duration,
-            },
-          }
-          local ok, _ = util.with_loading("Adding note", function()
-            return state.api:create_issue_note(issue_id, data)
-          end)
-          if ok then
-            vim.notify("Note added successfully with time tracking.")
-            refresh_view()
-            popup:unmount()
-          else
-            vim.notify("Failed to add note with time tracking.", vim.log.levels.ERROR)
-          end
+          vim.notify("Cancelled.", vim.log.levels.INFO)
         end
       end)
     end, { noremap = true, silent = true })

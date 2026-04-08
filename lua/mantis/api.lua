@@ -125,7 +125,7 @@ function M:call_api(endpoint, method, data)
     print('Body: ' .. response.body)
   end
 
-  if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
+  if response.status < 200 or response.status >= 300 then
     local error_message = "Mantis API Error"
     if response.body and response.body ~= "" then
       local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)

@@ -155,7 +155,7 @@ function M.render()
 
   local function create_issue()
     local ok, res = state.api:get_all_projects()
-    if not ok or #res.projects == 0 then
+    if not ok or not res or not res.projects or #res.projects == 0 then
       return
     end
     local projects = res.projects
@@ -252,7 +252,7 @@ function M.render()
     local fail_count = 0
     local total = #selected_issues
 
-    for i, issue in ipairs(selected_issues) do
+    for _, issue in ipairs(selected_issues) do
       local issue_data = data_fn(issue)
       if issue_data then
         local ok, res = state.api:update_issue(issue.id, issue_data)
@@ -559,7 +559,7 @@ function M.render()
   local body = function()
     local issue_table
     local current_node_type = nil  -- Track current node type for highlighting
-    local api_name = (state.api.name and state.api.name) or state.api.url
+    local api_name = state.api.name or state.api.url
 
     issue_table = n.tree({
       flex = 1,
@@ -598,7 +598,7 @@ function M.render()
 
         local bufnr = component.bufnr
         local ns_id = vim.api.nvim_create_namespace("mantis_selection")
-        vim.api.nvim_set_hl(0, "MantisSelection", { bg = "#1e1e2a" })
+        vim.api.nvim_set_hl(0, "MantisSelection", { link = "CursorLine", default = true })
 
         local function update_selection_indicator()
           vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
