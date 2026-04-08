@@ -286,7 +286,7 @@ function M:create_issue_note(issue_id, data)
 end
 
 function M:edit_issue_note(issue_id, note_id, data)
-  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'PATCH', data)
+  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'PUT', data)
 end
 
 function M:delete_issue_note(issue_id, note_id)
