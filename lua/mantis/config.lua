@@ -12,7 +12,7 @@ M.options = {
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   create_issue = {
@@ -24,7 +24,7 @@ M.options = {
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   view_issue = {
