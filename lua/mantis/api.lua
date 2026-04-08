@@ -109,6 +109,8 @@ function M:call_api(endpoint, method, data)
       return curl.post(url, opts)
     elseif method == 'PATCH' then
       return curl.patch(url, opts)
+    elseif method == 'PUT' then
+      return curl.put(url, opts)
     elseif method == 'DELETE' then
       return curl.delete(url, opts)
     else
