@@ -218,8 +218,8 @@ function M.render(issue_id)
 
         edit_popup:mount()
 
-        -- Pre-fill with existing note text
-        local note_lines = vim.split(note.text or "", "\n")
+        -- Pre-fill with existing note text (strip \r to avoid control chars)
+        local note_lines = vim.split((note.text or ""):gsub("\r\n?", "\n"), "\n")
         vim.api.nvim_buf_set_lines(edit_popup.bufnr, 0, -1, false, note_lines)
         vim.cmd("startinsert")
 
