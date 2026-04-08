@@ -20,6 +20,7 @@
 ---@field get_unassigned_issues fun(self, page_size?: number, page?: number): table
 ---@field add_attachments_to_issue fun(self, issue_id: number, data: table): table
 ---@field create_issue_note fun(self, issue_id: number, data: table): table
+---@field edit_issue_note fun(self, issue_id: number, note_id: number, data: table): table
 ---@field delete_issue_note fun(self, issue_id: number, note_id: number): nil
 ---@field monitor_issue fun(self, issue_id: number): table
 ---@field unmonitor_issue fun(self, issue_id: number, user_id: number): nil
@@ -282,6 +283,10 @@ end
 
 function M:create_issue_note(issue_id, data)
   return self:call_api('issues/' .. issue_id .. '/notes', 'POST', data)
+end
+
+function M:edit_issue_note(issue_id, note_id, data)
+  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'PATCH', data)
 end
 
 function M:delete_issue_note(issue_id, note_id)

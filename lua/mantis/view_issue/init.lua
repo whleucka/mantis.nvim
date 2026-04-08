@@ -60,7 +60,7 @@ function M.render(issue_id)
       text = {
         top = " Issue #" .. issue_id .. " ",
         top_align = "left",
-        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add note | " .. options.keymap.delete_note .. ": delete note ",
+        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add | " .. options.keymap.edit_note .. ": edit | " .. options.keymap.delete_note .. ": delete note ",
         bottom_align = "right",
       },
     },
@@ -165,6 +165,95 @@ function M.render(issue_id)
             vim.notify("Failed to delete note.", vim.log.levels.ERROR)
           end
         end)
+      end)
+    end, { noremap = true, silent = true })
+
+    popup:map("n", keymap.edit_note, function()
+      if not issue.notes or #issue.notes == 0 then
+        vim.notify("No notes to edit.", vim.log.levels.WARN)
+        return
+      end
+
+      suppress_leave = true
+      vim.ui.select(issue.notes, {
+        prompt = "Select a note to edit",
+        format_item = function(note)
+          local reporter = note.reporter and (note.reporter.real_name or note.reporter.name) or "Unknown"
+          local preview = (note.text or ""):gsub("\n", " ")
+          if #preview > 60 then
+            preview = preview:sub(1, 57) .. "..."
+          end
+          return string.format("[%s] %s", reporter, preview)
+        end,
+      }, function(note)
+        if not note then
+          suppress_leave = false
+          return
+        end
+
+        local note_opts = config.options.add_note
+        local edit_width = util.resolve_dimension(note_opts.ui.width, vim.o.columns, note_opts.ui.max_width)
+        local edit_height = util.resolve_dimension(note_opts.ui.height, vim.o.lines, note_opts.ui.max_height)
+
+        local edit_popup = Popup({
+          enter = true,
+          focusable = true,
+          border = {
+            style = "rounded",
+            text = {
+              top = " Edit Note ",
+              top_align = "left",
+              bottom = " " .. note_opts.keymap.quit .. ": quit | " .. note_opts.keymap.submit .. ": save ",
+              bottom_align = "right",
+            },
+          },
+          position = "50%",
+          size = {
+            width = edit_width,
+            height = edit_height,
+          },
+          zindex = 250,
+          win_options = { wrap = true },
+        })
+
+        edit_popup:mount()
+
+        -- Pre-fill with existing note text
+        local note_lines = vim.split(note.text or "", "\n")
+        vim.api.nvim_buf_set_lines(edit_popup.bufnr, 0, -1, false, note_lines)
+        vim.cmd("startinsert")
+
+        edit_popup:on(event.BufLeave, function()
+          edit_popup:unmount()
+          suppress_leave = false
+        end)
+
+        edit_popup:map("n", note_opts.keymap.quit, function()
+          edit_popup:unmount()
+          suppress_leave = false
+        end, { noremap = true, silent = true })
+
+        edit_popup:map("n", note_opts.keymap.submit, function()
+          local new_text = table.concat(vim.api.nvim_buf_get_lines(edit_popup.bufnr, 0, -1, false), "\n")
+          if new_text == "" then
+            vim.notify("Note text cannot be empty.", vim.log.levels.WARN)
+            return
+          end
+
+          local ok, _ = state.api:edit_issue_note(issue_id, note.id, { text = new_text })
+          if ok then
+            vim.notify("Note updated.", vim.log.levels.INFO)
+            edit_popup:unmount()
+            suppress_leave = false
+            local refreshed_issue = fetch_issue(issue_id)
+            if refreshed_issue then
+              issue = refreshed_issue
+              render_content(popup, issue, popup_width)
+            end
+          else
+            vim.notify("Failed to update note.", vim.log.levels.ERROR)
+          end
+        end, { noremap = true, silent = true })
       end)
     end, { noremap = true, silent = true })
 
