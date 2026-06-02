@@ -113,20 +113,6 @@ function M.open_url(url)
   vim.system(cmd, { detach = true })
 end
 
---- Execute a function with a loading indicator
----@param message string The loading message to display
----@param fn function The function to execute
----@return any ... Returns whatever the function returns
-function M.with_loading(message, fn)
-  vim.notify(message .. "...", vim.log.levels.INFO)
-  local results = { pcall(fn) }
-  local ok = table.remove(results, 1)
-  if not ok then
-    error(results[1])
-  end
-  return unpack(results)
-end
-
 --- Resolve a dimension value (percentage or absolute) with clamping
 ---@param value string|number The dimension value ("90%" or 80)
 ---@param total number The total screen dimension (vim.o.columns or vim.o.lines)

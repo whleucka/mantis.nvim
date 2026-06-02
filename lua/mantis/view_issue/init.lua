@@ -30,14 +30,18 @@ local function render_content(popup, issue, width)
   end
 end
 
-local function fetch_issue(issue_id)
-  local ok, res = util.with_loading("Loading issue #" .. issue_id, function()
-    return state.api:get_issue(issue_id)
+--- Fetch a single issue without blocking the editor.
+---@param issue_id number
+---@param callback fun(issue: table|nil)
+local function fetch_issue(issue_id, callback)
+  vim.notify("Loading issue #" .. issue_id .. "...", vim.log.levels.INFO)
+  state.api:get_issue(issue_id, function(ok, res)
+    if ok and res and res.issues and res.issues[1] then
+      callback(res.issues[1])
+    else
+      callback(nil)
+    end
   end)
-  if ok and res and res.issues and res.issues[1] then
-    return res.issues[1]
-  end
-  return nil
 end
 
 function M.render(issue_id)
@@ -45,49 +49,47 @@ function M.render(issue_id)
   local popup_width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width)
   local popup_height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height)
 
-  local issue = fetch_issue(issue_id)
+  fetch_issue(issue_id, function(issue)
+    if not issue then
+      vim.notify("Failed to fetch issue #" .. issue_id, vim.log.levels.ERROR)
+      return
+    end
 
-  if not issue then
-    vim.notify("Failed to fetch issue #" .. issue_id, vim.log.levels.ERROR)
-    return
-  end
-
-  local popup = Popup({
-    enter = true,
-    focusable = true,
-    border = {
-      style = "rounded",
-      text = {
-        top = " Issue #" .. issue_id .. " ",
-        top_align = "left",
-        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add | " .. options.keymap.delete_note .. ": delete note ",
-        bottom_align = "right",
+    local popup = Popup({
+      enter = true,
+      focusable = true,
+      border = {
+        style = "rounded",
+        text = {
+          top = " Issue #" .. issue_id .. " ",
+          top_align = "left",
+          bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add | " .. options.keymap.delete_note .. ": delete note ",
+          bottom_align = "right",
+        },
       },
-    },
-    position = "50%",
-    size = {
-      width = popup_width,
-      height = popup_height,
-    },
-    zindex = 200,
-    win_options = {
-      wrap = true,
-      cursorline = false,
-    },
-    buf_options = {
-      modifiable = false,
-      filetype = "mantis-issue",
-    },
-  })
+      position = "50%",
+      size = {
+        width = popup_width,
+        height = popup_height,
+      },
+      zindex = 200,
+      win_options = {
+        wrap = true,
+        cursorline = false,
+      },
+      buf_options = {
+        modifiable = false,
+        filetype = "mantis-issue",
+      },
+    })
 
-  popup:mount()
-  popup:on(event.WinClosed, function()
-    popup:unmount()
-  end)
+    popup:mount()
+    popup:on(event.WinClosed, function()
+      popup:unmount()
+    end)
 
-  render_content(popup, issue, popup_width)
+    render_content(popup, issue, popup_width)
 
-  local function set_keymaps()
     local keymap = options.keymap
 
     popup:map("n", keymap.quit, function()
@@ -95,23 +97,25 @@ function M.render(issue_id)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.refresh, function()
-      local refreshed_issue = fetch_issue(issue_id)
-      if refreshed_issue then
-        issue = refreshed_issue
-        render_content(popup, issue, popup_width)
-        vim.notify("Issue #" .. issue_id .. " refreshed", vim.log.levels.INFO)
-      else
-        vim.notify("Failed to refresh issue #" .. issue_id, vim.log.levels.ERROR)
-      end
+      fetch_issue(issue_id, function(refreshed_issue)
+        if refreshed_issue then
+          issue = refreshed_issue
+          render_content(popup, issue, popup_width)
+          vim.notify("Issue #" .. issue_id .. " refreshed", vim.log.levels.INFO)
+        else
+          vim.notify("Failed to refresh issue #" .. issue_id, vim.log.levels.ERROR)
+        end
+      end)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.add_note, function()
       add_note.render(issue_id, function()
-        local refreshed_issue = fetch_issue(issue_id)
-        if refreshed_issue then
-          issue = refreshed_issue
-          render_content(popup, issue, popup_width)
-        end
+        fetch_issue(issue_id, function(refreshed_issue)
+          if refreshed_issue then
+            issue = refreshed_issue
+            render_content(popup, issue, popup_width)
+          end
+        end)
       end)
     end, { noremap = true, silent = true })
 
@@ -145,17 +149,19 @@ function M.render(issue_id)
             return
           end
 
-          local ok, _ = state.api:delete_issue_note(issue_id, note.id)
-          if ok then
-            vim.notify("Note deleted.", vim.log.levels.INFO)
-            local refreshed_issue = fetch_issue(issue_id)
-            if refreshed_issue then
-              issue = refreshed_issue
-              render_content(popup, issue, popup_width)
+          state.api:delete_issue_note(issue_id, note.id, function(ok)
+            if ok then
+              vim.notify("Note deleted.", vim.log.levels.INFO)
+              fetch_issue(issue_id, function(refreshed_issue)
+                if refreshed_issue then
+                  issue = refreshed_issue
+                  render_content(popup, issue, popup_width)
+                end
+              end)
+            else
+              vim.notify("Failed to delete note.", vim.log.levels.ERROR)
             end
-          else
-            vim.notify("Failed to delete note.", vim.log.levels.ERROR)
-          end
+          end)
         end)
       end)
     end, { noremap = true, silent = true })
@@ -280,9 +286,7 @@ function M.render(issue_id)
     popup:map("n", keymap.goto_top, function()
       vim.api.nvim_win_set_cursor(popup.winid, { 1, 0 })
     end, { noremap = true, silent = true })
-  end
-
-  set_keymaps()
+  end)
 end
 
 return M

@@ -56,16 +56,16 @@ function M.render(issue_id, refresh_view)
       end
 
       local function submit_note(data)
-        local ok, _ = util.with_loading("Adding note", function()
-          return state.api:create_issue_note(issue_id, data)
+        vim.notify("Adding note...", vim.log.levels.INFO)
+        state.api:create_issue_note(issue_id, data, function(ok)
+          if ok then
+            vim.notify("Note added successfully.")
+            if refresh_view then refresh_view() end
+            popup:unmount()
+          else
+            vim.notify("Failed to add note.", vim.log.levels.ERROR)
+          end
         end)
-        if ok then
-          vim.notify("Note added successfully.")
-          if refresh_view then refresh_view() end
-          popup:unmount()
-        else
-          vim.notify("Failed to add note.", vim.log.levels.ERROR)
-        end
       end
 
       vim.ui.input({ prompt = "Track time? (y/n) ", default = "n" }, function(input)

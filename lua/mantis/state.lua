@@ -17,12 +17,31 @@ local M = {
   selected_issues = {},
 }
 
---- Get project users with caching
+--- Get project users with caching.
+--- When `callback` is supplied the fetch is non-blocking and the result is
+--- delivered via `callback(ok, users)`; otherwise it returns `ok, users`.
 ---@param project_id number
+---@param callback? fun(ok: boolean, users: table[]) async result handler
 ---@param force_refresh? boolean
----@return boolean ok
----@return table[] users
-function M.get_project_users(project_id, force_refresh)
+---@return boolean? ok
+---@return table[]? users
+function M.get_project_users(project_id, callback, force_refresh)
+  if callback then
+    if not force_refresh and M._users_cache[project_id] then
+      callback(true, M._users_cache[project_id])
+      return
+    end
+    M.api:get_project_users(project_id, function(ok, res)
+      if ok and res and res.users then
+        M._users_cache[project_id] = res.users
+        callback(true, res.users)
+      else
+        callback(false, {})
+      end
+    end)
+    return
+  end
+
   if not force_refresh and M._users_cache[project_id] then
     return true, M._users_cache[project_id]
   end
@@ -36,12 +55,31 @@ function M.get_project_users(project_id, force_refresh)
   return false, {}
 end
 
---- Get project categories with caching
+--- Get project categories with caching.
+--- When `callback` is supplied the fetch is non-blocking and the result is
+--- delivered via `callback(ok, categories)`; otherwise it returns `ok, categories`.
 ---@param project_id number
+---@param callback? fun(ok: boolean, categories: table[]) async result handler
 ---@param force_refresh? boolean
----@return boolean ok
----@return table[] categories
-function M.get_project_categories(project_id, force_refresh)
+---@return boolean? ok
+---@return table[]? categories
+function M.get_project_categories(project_id, callback, force_refresh)
+  if callback then
+    if not force_refresh and M._categories_cache[project_id] then
+      callback(true, M._categories_cache[project_id])
+      return
+    end
+    M.api:get_project_categories(project_id, function(ok, categories)
+      if ok and categories then
+        M._categories_cache[project_id] = categories
+        callback(true, categories)
+      else
+        callback(false, {})
+      end
+    end)
+    return
+  end
+
   if not force_refresh and M._categories_cache[project_id] then
     return true, M._categories_cache[project_id]
   end

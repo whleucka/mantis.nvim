@@ -57,139 +57,150 @@ function M.render()
     build_signal_nodes()
   end
 
-  local function fetch_issues(page)
-    local ok, res = false, nil
+  -- Guards against overlapping list fetches (e.g. mashing refresh/page keys)
+  -- now that requests are non-blocking.
+  local loading = false
+
+  ---@param page number
+  ---@param cb fun(ok: boolean, res: table|nil)
+  local function fetch_issues(page, cb)
     local mode = signal.mode:get_value()
     if mode == 'all' then
-      ok, res = state.api:get_issues(options.limit, page)
+      state.api:get_issues(options.limit, page, cb)
     elseif mode == 'monitored' then
-      ok, res = state.api:get_monitored_issues(options.limit, page)
+      state.api:get_monitored_issues(options.limit, page, cb)
     elseif mode == 'assigned' then
-      ok, res = state.api:get_assigned_issues(options.limit, page)
+      state.api:get_assigned_issues(options.limit, page, cb)
     elseif mode == 'unassigned' then
-      ok, res = state.api:get_unassigned_issues(options.limit, page)
+      state.api:get_unassigned_issues(options.limit, page, cb)
     elseif mode == 'reported' then
-      ok, res = state.api:get_reported_issues(options.limit, page)
+      state.api:get_reported_issues(options.limit, page, cb)
+    else
+      cb(false, nil)
     end
-    return ok, res
   end
 
   local function load_issues(show_loading)
-    local ok, res
+    if loading then return end
+    loading = true
     if show_loading then
-      ok, res = util.with_loading("Loading issues", function()
-        return fetch_issues(state.page)
-      end)
-    else
-      ok, res = fetch_issues(state.page)
+      vim.notify("Loading issues...", vim.log.levels.INFO)
     end
-    if ok and res and res.issues then
-      issues_cache = res.issues
-      build_signal_nodes()
-    end
-  end
-
-  local function update_issue(issue_id, issue_data)
-    local ok, res = state.api:update_issue(issue_id, issue_data)
-    if ok and res and #res.issues > 0 then
-      update_cache_issue(res.issues[1])
-    end
-  end
-
-  local function update_issue_options(issue, property_name, property_options)
-    local options_to_show = property_options
-    local prompt_opts = {
-      prompt = "Select a " .. property_name,
-      format_item = function(item)
-        return item.name
-      end,
-    }
-
-    if property_name == 'category' then
-      local ok, categories = state.get_project_categories(issue.project.id)
-      if not ok then
-        return
-      end
-      options_to_show = categories
-      prompt_opts.format_item = function(item)
-        return item.name
-      end
-    end
-
-    vim.ui.select(options_to_show, prompt_opts, function(choice)
-      if not choice then
-        return
-      end
-
-      local choice_name = (type(choice) == "table") and choice.name or choice
-      local data = {}
-      data[property_name] = { name = choice_name }
-
-      if property_name == 'status' and (choice.name == 'resolved' or choice.name == 'closed') then
-        vim.ui.select(config.options.issue_resolution_options, {
-          prompt = "Select a resolution",
-          format_item = function(item)
-            return item.name
-          end,
-        }, function(resolution_choice)
-          if not resolution_choice then
-            return
-          end
-          data['resolution'] = { id = resolution_choice.id }
-          update_issue(issue.id, data)
-        end)
-      else
-        update_issue(issue.id, data)
+    fetch_issues(state.page, function(ok, res)
+      loading = false
+      if ok and res and res.issues then
+        issues_cache = res.issues
+        build_signal_nodes()
       end
     end)
   end
 
-  local function add_note(issue_id)
-    ui.add_note(issue_id, function()
-      local ok, res = state.api:get_issue(issue_id)
-      if ok and res and res.issues and res.issues[1] then
+  local function update_issue(issue_id, issue_data)
+    state.api:update_issue(issue_id, issue_data, function(ok, res)
+      if ok and res and res.issues and #res.issues > 0 then
         update_cache_issue(res.issues[1])
       end
     end)
   end
 
-  local function create_issue()
-    local ok, res = state.api:get_all_projects()
-    if not ok or not res or not res.projects or #res.projects == 0 then
-      return
-    end
-    local projects = res.projects
-    vim.ui.select(projects, {
-        prompt = "Select a project",
+  local function update_issue_options(issue, property_name, property_options)
+    local function show_select(options_to_show)
+      vim.ui.select(options_to_show, {
+        prompt = "Select a " .. property_name,
         format_item = function(item)
           return item.name
+        end,
+      }, function(choice)
+        if not choice then
+          return
         end
-      },
-      function(choice)
-        if not choice then return end
-        ui.create_issue(choice.id)
-        renderer:close()
+
+        local choice_name = (type(choice) == "table") and choice.name or choice
+        local data = {}
+        data[property_name] = { name = choice_name }
+
+        if property_name == 'status' and (choice.name == 'resolved' or choice.name == 'closed') then
+          vim.ui.select(config.options.issue_resolution_options, {
+            prompt = "Select a resolution",
+            format_item = function(item)
+              return item.name
+            end,
+          }, function(resolution_choice)
+            if not resolution_choice then
+              return
+            end
+            data['resolution'] = { id = resolution_choice.id }
+            update_issue(issue.id, data)
+          end)
+        else
+          update_issue(issue.id, data)
+        end
+      end)
+    end
+
+    if property_name == 'category' then
+      state.get_project_categories(issue.project.id, function(ok, categories)
+        if not ok then
+          return
+        end
+        show_select(categories)
+      end)
+    else
+      show_select(property_options)
+    end
+  end
+
+  local function add_note(issue_id)
+    ui.add_note(issue_id, function()
+      state.api:get_issue(issue_id, function(ok, res)
+        if ok and res and res.issues and res.issues[1] then
+          update_cache_issue(res.issues[1])
+        end
+      end)
+    end)
+  end
+
+  local function create_issue()
+    state.api:get_all_projects(function(ok, res)
+      if not ok or not res or not res.projects or #res.projects == 0 then
+        return
       end
-    )
+      local projects = res.projects
+      vim.ui.select(projects, {
+          prompt = "Select a project",
+          format_item = function(item)
+            return item.name
+          end
+        },
+        function(choice)
+          if not choice then return end
+          ui.create_issue(choice.id)
+          renderer:close()
+        end
+      )
+    end)
   end
 
   local function change_page(direction)
+    if loading then return end
     local new_page = state.page + direction
     if new_page <= 0 then
       return
     end
 
-    local ok, res = util.with_loading("Loading page " .. new_page, function()
-      return fetch_issues(new_page)
+    loading = true
+    vim.notify("Loading page " .. new_page .. "...", vim.log.levels.INFO)
+    fetch_issues(new_page, function(ok, res)
+      loading = false
+      if ok and res and res.issues and #res.issues > 0 then
+        state.page = new_page
+        state.clear_selection() -- Clear selection on page change
+        issues_cache = res.issues
+        build_signal_nodes()
+      else
+        vim.notify("No more issues on the next page.", vim.log.levels.INFO)
+      end
     end)
-    if ok and res and res.issues and #res.issues > 0 then
-      state.page = new_page
-      state.clear_selection() -- Clear selection on page change
-      issues_cache = res.issues
-      build_signal_nodes()
-    else
-      vim.notify("No more issues on the next page.", vim.log.levels.INFO)
-    end
   end
 
   -- Selection functions
@@ -246,36 +257,55 @@ function M.render()
     return true, project_id
   end
 
-  -- Batch operation helper
+  -- Batch operation helper. Fires all updates concurrently and finalizes once
+  -- every dispatched request has reported back. Because async callbacks are
+  -- deferred to the main loop, no callback can fire before the dispatch loop
+  -- finishes, so `pending` is fully counted before the first decrement.
   local function batch_update(selected_issues, data_fn, on_complete)
     local success_count = 0
     local fail_count = 0
     local total = #selected_issues
+    local pending = 0
+    local dispatched = 0
+
+    local function finalize()
+      state.clear_selection()
+      build_signal_nodes()
+
+      if fail_count > 0 then
+        vim.notify(string.format("Updated %d/%d issues (%d failed)", success_count, total, fail_count), vim.log.levels.WARN)
+      else
+        vim.notify(string.format("Updated %d issues", success_count), vim.log.levels.INFO)
+      end
+
+      if on_complete then
+        on_complete()
+      end
+    end
 
     for _, issue in ipairs(selected_issues) do
       local issue_data = data_fn(issue)
       if issue_data then
-        local ok, res = state.api:update_issue(issue.id, issue_data)
-        if ok and res and #res.issues > 0 then
-          update_cache_issue(res.issues[1])
-          success_count = success_count + 1
-        else
-          fail_count = fail_count + 1
-        end
+        pending = pending + 1
+        dispatched = dispatched + 1
+        state.api:update_issue(issue.id, issue_data, function(ok, res)
+          if ok and res and res.issues and #res.issues > 0 then
+            update_cache_issue(res.issues[1])
+            success_count = success_count + 1
+          else
+            fail_count = fail_count + 1
+          end
+          pending = pending - 1
+          if pending == 0 then
+            finalize()
+          end
+        end)
       end
     end
 
-    state.clear_selection()
-    build_signal_nodes()
-
-    if fail_count > 0 then
-      vim.notify(string.format("Updated %d/%d issues (%d failed)", success_count, total, fail_count), vim.log.levels.WARN)
-    else
-      vim.notify(string.format("Updated %d issues", success_count), vim.log.levels.INFO)
-    end
-
-    if on_complete then
-      on_complete()
+    -- All data_fn calls returned nil (nothing to do): still clean up.
+    if dispatched == 0 then
+      finalize()
     end
   end
 
@@ -378,20 +408,21 @@ function M.render()
       return
     end
 
-    local ok, categories = state.get_project_categories(project_id)
-    if not ok then
-      vim.notify("Failed to load categories.", vim.log.levels.ERROR)
-      return
-    end
+    state.get_project_categories(project_id, function(ok, categories)
+      if not ok then
+        vim.notify("Failed to load categories.", vim.log.levels.ERROR)
+        return
+      end
 
-    vim.ui.select(categories, {
-      prompt = string.format("Change category for %d issues", count),
-      format_item = function(item) return item.name end,
-    }, function(choice)
-      if not choice then return end
+      vim.ui.select(categories, {
+        prompt = string.format("Change category for %d issues", count),
+        format_item = function(item) return item.name end,
+      }, function(choice)
+        if not choice then return end
 
-      batch_update(selected_issues, function(issue)
-        return { category = { name = choice.name } }
+        batch_update(selected_issues, function(issue)
+          return { category = { name = choice.name } }
+        end)
       end)
     end)
   end
@@ -411,20 +442,21 @@ function M.render()
       return
     end
 
-    local ok, users = state.get_project_users(project_id)
-    if not ok then
-      vim.notify("Failed to load users.", vim.log.levels.ERROR)
-      return
-    end
+    state.get_project_users(project_id, function(ok, users)
+      if not ok then
+        vim.notify("Failed to load users.", vim.log.levels.ERROR)
+        return
+      end
 
-    vim.ui.select(users, {
-      prompt = string.format("Assign user to %d issues", count),
-      format_item = function(item) return item.name end,
-    }, function(choice)
-      if not choice then return end
+      vim.ui.select(users, {
+        prompt = string.format("Assign user to %d issues", count),
+        format_item = function(item) return item.name end,
+      }, function(choice)
+        if not choice then return end
 
-      batch_update(selected_issues, function(issue)
-        return { handler = { name = choice.name } }
+        batch_update(selected_issues, function(issue)
+          return { handler = { name = choice.name } }
+        end)
       end)
     end)
   end
@@ -453,24 +485,33 @@ function M.render()
 
       local success_count = 0
       local fail_count = 0
+      local pending = 0
 
-      for _, issue in ipairs(selected_issues) do
-        local ok, _ = state.api:delete_issue(issue.id)
-        if ok then
-          remove_cache_issue(issue.id)
-          success_count = success_count + 1
+      local function finalize()
+        state.clear_selection()
+        build_signal_nodes()
+
+        if fail_count > 0 then
+          vim.notify(string.format("Deleted %d/%d issues (%d failed)", success_count, count, fail_count), vim.log.levels.WARN)
         else
-          fail_count = fail_count + 1
+          vim.notify(string.format("Deleted %d issues", success_count), vim.log.levels.INFO)
         end
       end
 
-      state.clear_selection()
-      build_signal_nodes()
-
-      if fail_count > 0 then
-        vim.notify(string.format("Deleted %d/%d issues (%d failed)", success_count, count, fail_count), vim.log.levels.WARN)
-      else
-        vim.notify(string.format("Deleted %d issues", success_count), vim.log.levels.INFO)
+      for _, issue in ipairs(selected_issues) do
+        pending = pending + 1
+        state.api:delete_issue(issue.id, function(ok)
+          if ok then
+            remove_cache_issue(issue.id)
+            success_count = success_count + 1
+          else
+            fail_count = fail_count + 1
+          end
+          pending = pending - 1
+          if pending == 0 then
+            finalize()
+          end
+        end)
       end
     end)
   end
@@ -479,13 +520,14 @@ function M.render()
     vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue_id .. '? (y/n) ', default = 'n' },
       function(input)
         if input and input:lower() == 'y' then
-          local ok, _ = state.api:delete_issue(issue_id)
-          if ok then
-            vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
-            remove_cache_issue(issue_id)
-          else
-            vim.notify('Failed to delete issue #' .. issue_id, vim.log.levels.ERROR)
-          end
+          state.api:delete_issue(issue_id, function(ok)
+            if ok then
+              vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
+              remove_cache_issue(issue_id)
+            else
+              vim.notify('Failed to delete issue #' .. issue_id, vim.log.levels.ERROR)
+            end
+          end)
         else
           vim.notify('Deletion cancelled.', vim.log.levels.INFO)
         end
@@ -502,43 +544,41 @@ function M.render()
 
       signal.mode = choice
       state.current_filter = choice
-      load_issues(false)
+      state.page = 1            -- new filter starts from the first page
+      state.clear_selection()   -- selections from the previous filter no longer apply
+      load_issues(true)
     end)
   end
 
   local function assign_user(project_id, issue_id)
-    local ok, users = state.get_project_users(project_id)
-    if not ok then
-      return
-    end
-
-    vim.ui.select(users, {
-      prompt = "Select a user to assign",
-      format_item = function(item)
-        return item.name
-      end,
-    }, function(choice)
-      if not choice then
+    state.get_project_users(project_id, function(ok, users)
+      if not ok then
         return
       end
 
-      local data = {
-        handler = { name = choice.name }
-      }
-      local res_ok, res = state.api:update_issue(issue_id, data)
-      if res_ok and res and #res.issues > 0 then
-        update_cache_issue(res.issues[1])
-      end
+      vim.ui.select(users, {
+        prompt = "Select a user to assign",
+        format_item = function(item)
+          return item.name
+        end,
+      }, function(choice)
+        if not choice then
+          return
+        end
+
+        update_issue(issue_id, { handler = { name = choice.name } })
+      end)
     end)
   end
 
   local function monitor_issue(issue_id)
-    local ok, _ = state.api:monitor_issue(issue_id)
-    if ok then
-      vim.notify("Now monitoring issue #" .. issue_id, vim.log.levels.INFO)
-    else
-      vim.notify("Failed to monitor issue #" .. issue_id, vim.log.levels.ERROR)
-    end
+    state.api:monitor_issue(issue_id, function(ok)
+      if ok then
+        vim.notify("Now monitoring issue #" .. issue_id, vim.log.levels.INFO)
+      else
+        vim.notify("Failed to monitor issue #" .. issue_id, vim.log.levels.ERROR)
+      end
+    end)
   end
 
   local function change_summary(issue_id, summary)
@@ -547,13 +587,7 @@ function M.render()
       return
     end
 
-    local data = {
-      summary = new_summary
-    }
-    local ok, res = state.api:update_issue(issue_id, data)
-    if ok and res and #res.issues > 0 then
-      update_cache_issue(res.issues[1])
-    end
+    update_issue(issue_id, { summary = new_summary })
   end
 
   local function get_selected_issue()
