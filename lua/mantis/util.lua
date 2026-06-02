@@ -26,37 +26,44 @@ function M.print(o)
   print(vim.inspect(o))
 end
 
--- Timezone offset calculated once at module load
-local timezone_offset = (function()
-  local now = os.time()
-  local local_t = os.date("*t", now)
-  local utc_t = os.date("!*t", now)
-  local_t.isdst = false
-  return os.difftime(os.time(local_t), os.time(utc_t))
-end)()
+--- Convert a UTC date/time to epoch seconds (timezone-independent).
+--- Uses Howard Hinnant's days-from-civil algorithm so there is no
+--- dependence on the local timezone or DST.
+local function utc_to_epoch(y, m, d, hh, mm, ss)
+  local yy = (m <= 2) and (y - 1) or y
+  local era = math.floor((yy >= 0 and yy or yy - 399) / 400)
+  local yoe = yy - era * 400
+  local doy = math.floor((153 * ((m + 9) % 12) + 2) / 5) + d - 1
+  local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+  local days = era * 146097 + doe - 719468
+  return days * 86400 + hh * 3600 + mm * 60 + ss
+end
 
---- Parse an ISO8601 timestamp to epoch seconds
+--- Parse an ISO8601 timestamp to epoch seconds.
+--- Honors the timezone offset embedded in the string (e.g. "-06:00", "Z",
+--- "+00:00") and returns an absolute epoch, so comparisons against os.time()
+--- are correct regardless of the machine's local timezone.
 ---@param ts string ISO8601 timestamp (e.g., "2024-01-15T10:30:00-05:00")
 ---@return number|nil epoch Epoch seconds or nil if parsing fails
 function M.parse_iso8601(ts)
   if not ts then return nil end
-  local date, time = ts:match("^(%d+-%d+-%d+)T(%d+:%d+:%d+)")
-  if not date or not time then
+  local y, m, d, hh, mm, ss = ts:match("^(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)")
+  if not y then
     return nil
   end
 
-  local y, m, d = date:match("(%d+)-(%d+)-(%d+)")
-  local hh, mm, ss = time:match("(%d+):(%d+):(%d+)")
+  local epoch = utc_to_epoch(tonumber(y), tonumber(m), tonumber(d),
+    tonumber(hh), tonumber(mm), tonumber(ss))
 
-  return os.time({
-    year  = tonumber(y),
-    month = tonumber(m),
-    day   = tonumber(d),
-    hour  = tonumber(hh),
-    min   = tonumber(mm),
-    sec   = tonumber(ss),
-    isdst = false,
-  }) + timezone_offset
+  -- Subtract the offset embedded in the timestamp to get true UTC.
+  -- No offset (or trailing "Z") means the value is already UTC.
+  local sign, oh, om = ts:match("([+-])(%d%d):?(%d%d)$")
+  if sign then
+    local off = (tonumber(oh) * 3600 + tonumber(om) * 60) * (sign == "-" and -1 or 1)
+    epoch = epoch - off
+  end
+
+  return epoch
 end
 
 --- Format an ISO8601 timestamp as a human-readable datetime
