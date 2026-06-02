@@ -38,7 +38,6 @@ M.options = {
       quit = "q",
       refresh = "r",
       add_note = "N",
-      edit_note = "en",
       delete_note = "dn",
       scroll_down = "j",
       scroll_up = "k",

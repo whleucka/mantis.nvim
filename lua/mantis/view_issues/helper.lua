@@ -99,8 +99,9 @@ function M.prepare_node(node, line, component)
     end
 
     if columns.id then
-      local id = n.text(string.format("%0" .. columns.id .. "d ", util.truncate(tostring(issue.id), columns.id)),
-        status_fg)
+      -- Zero-pad the numeric id to the column width. Never run it through
+      -- truncate(): that returns "…" past the width and would crash %d.
+      local id = n.text(string.format("%0" .. columns.id .. "d ", issue.id), status_fg)
       line:append(id)
     end
 

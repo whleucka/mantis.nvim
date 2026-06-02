@@ -306,7 +306,11 @@ function M.render()
   -- Apply highlights
   local ns = vim.api.nvim_create_namespace("mantis_help")
   for _, hl in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(popup.bufnr, ns, hl.hl, hl.line - 1, hl.col, hl.end_col)
+    vim.api.nvim_buf_set_extmark(popup.bufnr, ns, hl.line - 1, hl.col, {
+      end_col = hl.end_col,
+      hl_group = hl.hl,
+      strict = false,
+    })
   end
 
   -- Keymaps to close

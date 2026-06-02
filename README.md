@@ -40,7 +40,7 @@
 
 - Inspect full issue details including custom fields
 - Browse and add notes with optional time tracking
-- Edit and delete notes
+- Delete notes
 - Review issue history
 
 ## Requirements
@@ -168,7 +168,6 @@ require('mantis').setup({
       quit = "q",
       refresh = "r",
       add_note = "N",
-      edit_note = "en",
       delete_note = "dn",
       scroll_down = "j",
       scroll_up = "k",
@@ -310,12 +309,11 @@ require('mantis').setup({
 | `<C-d>` / `<C-u>` | Page down/up |
 | `gg` / `G` | Go to top/bottom |
 | `N` | Add note |
-| `en` | Edit note |
 | `dn` | Delete note |
 | `r` | Refresh |
 | `q` | Quit |
 
-### Keymaps (Add Note / Edit Note)
+### Keymaps (Add Note)
 
 | Key | Action |
 |-----|--------|

@@ -100,7 +100,7 @@ local function process_response(response)
   if response.status < 200 or response.status >= 300 then
     local error_message = "Mantis API Error"
     if response.body and response.body ~= "" then
-      local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
+      local decode_ok, decoded = pcall(vim.json.decode, response.body)
       if decode_ok and type(decoded) == "table" and decoded.message then
         error_message = decoded.message
       else
@@ -112,7 +112,7 @@ local function process_response(response)
   end
 
   if response.body and response.body ~= '' then
-    local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
+    local decode_ok, decoded = pcall(vim.json.decode, response.body)
     if decode_ok then
       return true, decoded
     else
@@ -156,7 +156,7 @@ function M:call_api(endpoint, method, data, callback)
   }
 
   if data then
-    opts.body = vim.fn.json_encode(data)
+    opts.body = vim.json.encode(data)
   end
 
   if config.options.debug then
