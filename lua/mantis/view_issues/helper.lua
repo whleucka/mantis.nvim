@@ -27,6 +27,12 @@ function M.get_summary_width()
   -- Fixed overhead: checkbox (4) + tree prefix (4) + border (4) + padding
   local overhead = 13
 
+  -- Monitor indicator column: icon display width + 1 separator (matches
+  -- prepare_node). Without this the summary is sized too wide and the last
+  -- character of the line gets clipped by the window border.
+  local monitor_icon = config.options.monitor_icon or ""
+  overhead = overhead + math.max(1, vim.fn.strdisplaywidth(monitor_icon)) + 1
+
   -- Sum of fixed column widths (each has 1 space after)
   local fixed_width = 0
   for col, w in pairs(columns) do
