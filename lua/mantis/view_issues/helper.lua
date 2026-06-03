@@ -63,9 +63,13 @@ function M.prepare_node(node, line, component)
     local checkbox_hl = is_selected and "DiagnosticOk" or "Comment"
     line:append(n.text(checkbox, checkbox_hl))
 
-    -- Monitor indicator: 👁 when the current user is monitoring this issue,
-    -- two spaces otherwise so the following columns stay aligned.
-    line:append(n.text(state.is_monitored(issue.id) and "👁 " or "  ", "DiagnosticInfo"))
+    -- Monitor indicator: 👁 when the current user is monitoring this issue.
+    -- Pad to a fixed display width measured at render time so monitored and
+    -- unmonitored rows stay column-aligned regardless of how the terminal
+    -- measures the emoji (the variation selector forces emoji presentation).
+    local monitor_mark = state.is_monitored(issue.id) and "👁️" or ""
+    monitor_mark = monitor_mark .. string.rep(" ", math.max(0, 2 - vim.fn.strdisplaywidth(monitor_mark)))
+    line:append(n.text(monitor_mark, "DiagnosticInfo"))
 
     if node.ungrouped then
       line:append(n.text("", "Comment"))
