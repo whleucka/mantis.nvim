@@ -480,8 +480,15 @@ function M.render()
     end
 
     state.get_project_users(project_id, function(ok, users)
-      if not ok then
-        vim.notify("Failed to load users.", vim.log.levels.ERROR)
+      if not ok or vim.tbl_isempty(users) then
+        -- Host doesn't support listing project users; prompt for a
+        -- username to assign to all selected issues instead.
+        vim.ui.input({ prompt = string.format("Assign username to %d issues: ", count) }, function(name)
+          if not name or name == "" then return end
+          batch_update(selected_issues, function(issue)
+            return { handler = { name = name } }
+          end)
+        end)
         return
       end
 
@@ -587,9 +594,24 @@ function M.render()
     end)
   end
 
+  -- Fallback for MantisBT instances that don't expose the
+  -- `projects/{id}/users` REST route (added in 2.25.0): prompt for a
+  -- username to assign as the handler.
+  local function assign_user_by_name(issue_id)
+    vim.ui.input({ prompt = "Assign username (handler): " }, function(name)
+      if not name or name == "" then
+        return
+      end
+      update_issue(issue_id, { handler = { name = name } })
+    end)
+  end
+
   local function assign_user(project_id, issue_id)
     state.get_project_users(project_id, function(ok, users)
-      if not ok then
+      if not ok or vim.tbl_isempty(users) then
+        -- The host doesn't support listing project users; fall back to
+        -- entering the username manually so assignment still works.
+        assign_user_by_name(issue_id)
         return
       end
 
