@@ -11,6 +11,8 @@ local M = {
   _users_cache = {},
   ---@type table<number, table[]> project_id -> categories array
   _categories_cache = {},
+  ---@type table|nil authenticated user (from users/me); cleared on host switch
+  _current_user = nil,
 
   -- Selection state for batch operations
   ---@type table<number, boolean> issue_id -> selected
@@ -102,7 +104,27 @@ end
 function M.clear_caches()
   M._users_cache = {}
   M._categories_cache = {}
+  M._current_user = nil
   M.monitored_issues = {}
+end
+
+--- Get the authenticated user's id (from users/me), cached for the session.
+--- Always async: the result is delivered via `callback(id)` where `id` is the
+--- numeric user id, or `nil` if it could not be resolved.
+---@param callback fun(id: number|nil)
+function M.get_current_user_id(callback)
+  if M._current_user and M._current_user.id then
+    callback(M._current_user.id)
+    return
+  end
+  M.api:get_current_user(function(ok, user)
+    if ok and user and user.id then
+      M._current_user = user
+      callback(user.id)
+    else
+      callback(nil)
+    end
+  end)
 end
 
 --- Toggle selection state for an issue

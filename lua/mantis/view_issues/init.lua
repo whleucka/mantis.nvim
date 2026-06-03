@@ -598,6 +598,33 @@ function M.render()
     end)
   end
 
+  local function unmonitor_issue(issue_id)
+    state.get_current_user_id(function(user_id)
+      if not user_id then
+        vim.notify("Could not resolve current user to unmonitor issue.", vim.log.levels.ERROR)
+        return
+      end
+      state.api:unmonitor_issue(issue_id, user_id, function(ok)
+        if ok then
+          state.set_monitored(issue_id, false)
+          build_signal_nodes()
+          vim.notify("Stopped monitoring issue #" .. issue_id, vim.log.levels.INFO)
+        else
+          vim.notify("Failed to unmonitor issue #" .. issue_id, vim.log.levels.ERROR)
+        end
+      end)
+    end)
+  end
+
+  -- Toggle monitor state for an issue based on the locally-tracked set.
+  local function toggle_monitor_issue(issue_id)
+    if state.is_monitored(issue_id) then
+      unmonitor_issue(issue_id)
+    else
+      monitor_issue(issue_id)
+    end
+  end
+
   local function change_summary(issue_id, summary)
     local new_summary = vim.fn.input("New summary: ", summary)
     if not new_summary or new_summary == "" then
@@ -733,7 +760,7 @@ function M.render()
         vim.keymap.set("n", keymap.monitor, function()
           local issue = get_selected_issue()
           if not issue then return end
-          monitor_issue(issue.id)
+          toggle_monitor_issue(issue.id)
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.filter, function()

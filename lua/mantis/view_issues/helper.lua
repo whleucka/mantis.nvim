@@ -63,12 +63,14 @@ function M.prepare_node(node, line, component)
     local checkbox_hl = is_selected and "DiagnosticOk" or "Comment"
     line:append(n.text(checkbox, checkbox_hl))
 
-    -- Monitor indicator: a Nerd Font eye (nf-fa-eye, U+F06E) when the current
-    -- user is monitoring this issue. A Nerd Font glyph renders reliably in the
-    -- user's font where a bare emoji does not. Pad to a fixed display width
-    -- measured at render time so monitored and unmonitored rows stay aligned.
-    local monitor_mark = state.is_monitored(issue.id) and "\239\129\174" or ""
-    monitor_mark = monitor_mark .. string.rep(" ", math.max(0, 2 - vim.fn.strdisplaywidth(monitor_mark)))
+    -- Monitor indicator (config.monitor_icon) shown when the current user is
+    -- monitoring this issue. Pad to the icon's display width, measured at
+    -- render time, so monitored and unmonitored rows stay column-aligned
+    -- regardless of how the terminal sizes the glyph.
+    local monitor_icon = config.options.monitor_icon or ""
+    local icon_width = math.max(1, vim.fn.strdisplaywidth(monitor_icon))
+    local monitor_mark = state.is_monitored(issue.id) and monitor_icon or ""
+    monitor_mark = monitor_mark .. string.rep(" ", icon_width + 1 - vim.fn.strdisplaywidth(monitor_mark))
     line:append(n.text(monitor_mark, "DiagnosticInfo"))
 
     if node.ungrouped then

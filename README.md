@@ -18,7 +18,7 @@
 - Open issues directly in your browser
 - Update status, priority, severity, category, and summary
 - Add notes to existing issues
-- Monitor issues
+- Monitor/unmonitor issues (monitored issues show a 👁 indicator in the list)
 - Toggle grouped/ungrouped view (group by project)
 - Priority emojis with customizable icons
 - Selection and batch operations
@@ -245,6 +245,9 @@ require('mantis').setup({
     normal    = "🔵",
     default   = "🟣",
   },
+  -- Indicator shown beside issues you are monitoring. Defaults to the 👁 emoji;
+  -- set a Nerd Font glyph (e.g. "" / nf-fa-eye) if your font renders it better.
+  monitor_icon = "👁️",
 }
 ```
 
@@ -274,7 +277,7 @@ require('mantis').setup({
 | `V` | Change severity |
 | `c` | Change category |
 | `S` | Change summary |
-| `m` | Monitor issue |
+| `m` | Toggle monitoring an issue (monitored issues show a 👁 indicator) |
 | `F` | Filter issues |
 | `<C-g>` | Toggle group by project |
 | `r` | Refresh |

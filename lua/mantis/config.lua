@@ -120,6 +120,8 @@ M.options = {
     normal    = "🔵",
     default   = "🟣" -- if no priority is set
   },
+  -- Indicator shown beside issues the current user is monitoring.
+  monitor_icon = "👀",
 }
 
 function M.setup(options)

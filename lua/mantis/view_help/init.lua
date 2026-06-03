@@ -29,7 +29,7 @@ local function get_help_groups()
         { key = "change_severity", label = "Change severity" },
         { key = "change_priority", label = "Change priority" },
         { key = "change_category", label = "Change category" },
-        { key = "monitor",         label = "Monitor issue" },
+        { key = "monitor",         label = "Toggle monitor issue" },
       },
     },
     {

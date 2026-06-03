@@ -13,6 +13,7 @@
 ---@field get_issue_files fun(self, issue_id: number, callback?: MantisCallback): boolean?, table?
 ---@field get_issue_file fun(self, issue_id: number, file_id: number, callback?: MantisCallback): boolean?, table?
 ---@field get_project_issues fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_current_user fun(self, callback?: MantisCallback): boolean?, table?
 ---@field get_project_users fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
 ---@field get_project_categories fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
 ---@field get_filtered_issues fun(self, filter_id: string|number, callback?: MantisCallback): boolean?, table?
@@ -296,6 +297,10 @@ end
 
 function M:get_project_issues(project_id, callback)
   return self:get_issues({ project_id = project_id }, nil, callback)
+end
+
+function M:get_current_user(callback)
+  return self:call_api('users/me', 'GET', nil, callback)
 end
 
 function M:get_project_users(project_id, callback)
