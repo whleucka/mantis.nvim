@@ -29,9 +29,29 @@ function M.render()
 
   local issues_cache = {}
 
+  -- The tree component, assigned when the body mounts. Hoisted here so the
+  -- async load callbacks can snap focus back to the top once new nodes land.
+  local issue_table
+
   local function build_signal_nodes()
     local grouped = signal.grouped:get_value()
     signal.issue_nodes = helper.build_nodes(issues_cache, grouped)
+  end
+
+  -- A fresh list renders asynchronously over an initially-empty buffer, which
+  -- leaves the cursor parked on a trailing blank line (it looks like the list
+  -- "starts at the bottom"). That line isn't a tree node, so the tree's j/k
+  -- navigation computes an out-of-range cursor and crashes. Snap focus back to
+  -- the first row after the new nodes are rendered. Scheduled so it runs after
+  -- the signal-driven re-render that fills the buffer.
+  local function reset_tree_focus()
+    if not issue_table then return end
+    vim.schedule(function()
+      local winid = issue_table.winid
+      if winid and vim.api.nvim_win_is_valid(winid) then
+        pcall(vim.api.nvim_win_set_cursor, winid, { 1, 0 })
+      end
+    end)
   end
 
   local function update_cache_issue(updated_issue)
@@ -91,6 +111,7 @@ function M.render()
       if ok and res and res.issues then
         issues_cache = res.issues
         build_signal_nodes()
+        reset_tree_focus()
       end
     end)
   end
@@ -212,6 +233,7 @@ function M.render()
         state.clear_selection() -- Clear selection on page change
         issues_cache = res.issues
         build_signal_nodes()
+        reset_tree_focus()
       else
         vim.notify("No more issues on the next page.", vim.log.levels.INFO)
       end
@@ -644,7 +666,6 @@ function M.render()
   end
 
   local body = function()
-    local issue_table
     local current_node_type = nil  -- Track current node type for highlighting
     local api_name = state.api.name or state.api.url
 
