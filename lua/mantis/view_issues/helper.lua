@@ -63,6 +63,10 @@ function M.prepare_node(node, line, component)
     local checkbox_hl = is_selected and "DiagnosticOk" or "Comment"
     line:append(n.text(checkbox, checkbox_hl))
 
+    -- Monitor indicator: 👁 when the current user is monitoring this issue,
+    -- two spaces otherwise so the following columns stay aligned.
+    line:append(n.text(state.is_monitored(issue.id) and "👁 " or "  ", "DiagnosticInfo"))
+
     if node.ungrouped then
       line:append(n.text("", "Comment"))
     elseif node.index == node.count then

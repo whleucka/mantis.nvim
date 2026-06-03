@@ -95,6 +95,21 @@ function M.render()
     end)
   end
 
+  -- Mirror the user's server-side monitored issues into local state so the
+  -- list view can show an indicator. Fetched in the background; re-renders
+  -- once resolved.
+  local function load_monitored_set()
+    state.api:get_monitored_issues(1000, 1, function(ok, res)
+      if not ok or not res or not res.issues then return end
+      local ids = {}
+      for _, issue in ipairs(res.issues) do
+        table.insert(ids, issue.id)
+      end
+      state.set_monitored_ids(ids)
+      build_signal_nodes()
+    end)
+  end
+
   local function update_issue(issue_id, issue_data)
     state.api:update_issue(issue_id, issue_data, function(ok, res)
       if ok and res and res.issues and #res.issues > 0 then
@@ -574,6 +589,8 @@ function M.render()
   local function monitor_issue(issue_id)
     state.api:monitor_issue(issue_id, function(ok)
       if ok then
+        state.set_monitored(issue_id, true)
+        build_signal_nodes()
         vim.notify("Now monitoring issue #" .. issue_id, vim.log.levels.INFO)
       else
         vim.notify("Failed to monitor issue #" .. issue_id, vim.log.levels.ERROR)
@@ -803,6 +820,7 @@ function M.render()
   end
 
   load_issues(false)  -- no loading indicator on initial load
+  load_monitored_set() -- background fetch; re-renders the indicator when ready
   renderer:render(body)
 end
 

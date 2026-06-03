@@ -15,6 +15,11 @@ local M = {
   -- Selection state for batch operations
   ---@type table<number, boolean> issue_id -> selected
   selected_issues = {},
+
+  -- Issues the current user is monitoring (server-side state mirrored locally
+  -- so the list view can show an indicator). Cleared on host switch.
+  ---@type table<number, boolean> issue_id -> monitored
+  monitored_issues = {},
 }
 
 --- Get project users with caching.
@@ -97,6 +102,7 @@ end
 function M.clear_caches()
   M._users_cache = {}
   M._categories_cache = {}
+  M.monitored_issues = {}
 end
 
 --- Toggle selection state for an issue
@@ -139,6 +145,30 @@ function M.get_selected_ids()
     table.insert(ids, id)
   end
   return ids
+end
+
+--- Check if the current user is monitoring an issue
+---@param id number
+---@return boolean
+function M.is_monitored(id)
+  return M.monitored_issues[id] == true
+end
+
+--- Set the monitored state for a single issue
+---@param id number
+---@param monitored boolean
+function M.set_monitored(id, monitored)
+  M.monitored_issues[id] = monitored and true or nil
+end
+
+--- Replace the whole monitored set from a list of issue IDs
+---@param ids number[]
+function M.set_monitored_ids(ids)
+  local set = {}
+  for _, id in ipairs(ids) do
+    set[id] = true
+  end
+  M.monitored_issues = set
 end
 
 return M
