@@ -374,8 +374,43 @@ function M:monitor_issue(issue_id, callback)
   return self:call_api('issues/' .. issue_id .. '/monitors', 'POST', nil, callback)
 end
 
+-- MantisBT (verified on 2.24.4) exposes no DELETE route for issue monitors;
+-- the monitors list can only be replaced via PATCH /issues/{id}. To drop a
+-- single user we fetch the current monitors and PATCH back the remainder,
+-- preserving anyone else monitoring the issue.
+---@param issue_id number
+---@param user_id number user to stop monitoring (typically the current user)
+---@param callback? MantisCallback
 function M:unmonitor_issue(issue_id, user_id, callback)
-  return self:call_api('issues/' .. issue_id .. '/monitors/' .. user_id, 'DELETE', nil, callback)
+  local function remaining_monitors(issue)
+    local monitors = (issue and issue.monitors) or {}
+    local keep = {}
+    for _, m in ipairs(monitors) do
+      if m.id ~= user_id then
+        table.insert(keep, { id = m.id })
+      end
+    end
+    return keep
+  end
+
+  if callback then
+    self:call_api('issues/' .. issue_id, 'GET', nil, function(ok, res)
+      if not ok or not res or not res.issues or not res.issues[1] then
+        callback(false, res)
+        return
+      end
+      self:call_api('issues/' .. issue_id, 'PATCH',
+        { monitors = remaining_monitors(res.issues[1]) }, callback)
+    end)
+    return
+  end
+
+  local ok, res = self:call_api('issues/' .. issue_id, 'GET')
+  if not ok or not res or not res.issues or not res.issues[1] then
+    return false, res
+  end
+  return self:call_api('issues/' .. issue_id, 'PATCH',
+    { monitors = remaining_monitors(res.issues[1]) })
 end
 
 function M:add_tags_to_issue(issue_id, data, callback)
