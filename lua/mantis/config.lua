@@ -50,6 +50,9 @@ M.options = {
   view_issues = {
     default_filter = 'all', -- default filter: 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
+    -- Silently re-fetch the list on this interval (seconds); 0/false disables.
+    -- Preserves cursor row and selection.
+    auto_refresh_interval = 120,
     -- Window layout: 'float' (centered popup, default) or 'split' (panel docked
     -- flush to a screen edge). 'split' is a full-height/width floating panel; it
     -- overlays rather than reflows other windows.

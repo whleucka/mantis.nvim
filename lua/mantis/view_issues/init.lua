@@ -232,6 +232,30 @@ function M.render()
     end)
   end
 
+  -- Silent background refresh for the auto-refresh timer. Unlike load_issues it
+  -- does NOT snap focus to the top: it restores the cursor row (clamped) so an
+  -- interval refresh doesn't yank the user around. Selections live in `state`
+  -- by id, so they survive the rebuild.
+  local function auto_refresh()
+    if loading then return end
+    loading = true
+    fetch_issues(state.page, function(ok, res)
+      loading = false
+      if not (ok and res and res.issues) then return end
+      issues_cache = res.issues
+      local row
+      if window and window.winid and vim.api.nvim_win_is_valid(window.winid) then
+        row = vim.api.nvim_win_get_cursor(window.winid)[1]
+      end
+      refresh_list()
+      if row and window and window.winid and vim.api.nvim_win_is_valid(window.winid) then
+        local total = vim.api.nvim_buf_line_count(window.bufnr)
+        pcall(vim.api.nvim_win_set_cursor, window.winid, { math.max(1, math.min(row, total)), 0 })
+        update_selection_indicator()
+      end
+    end)
+  end
+
   -- Mirror the user's server-side monitored issues into local state so the
   -- list view can show an indicator. Fetched in the background; re-renders
   -- once resolved.
@@ -971,6 +995,39 @@ function M.render()
       end
     end,
   })
+
+  -- Auto-refresh on an interval (config.auto_refresh_interval seconds; 0/false
+  -- disables). The libuv timer is torn down when the list buffer goes away so it
+  -- never fires against a closed window or leaks across reopens.
+  local uv = vim.uv or vim.loop
+  local refresh_timer
+  local function stop_refresh_timer()
+    if refresh_timer then
+      pcall(function()
+        refresh_timer:stop()
+        if not refresh_timer:is_closing() then refresh_timer:close() end
+      end)
+      refresh_timer = nil
+    end
+  end
+
+  local interval = options.auto_refresh_interval
+  if interval and interval > 0 then
+    refresh_timer = uv.new_timer()
+    local ms = math.floor(interval * 1000)
+    refresh_timer:start(ms, ms, vim.schedule_wrap(function()
+      if not (window and window.winid and vim.api.nvim_win_is_valid(window.winid)) then
+        stop_refresh_timer()
+        return
+      end
+      auto_refresh()
+    end))
+    vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {
+      buffer = window.bufnr,
+      once = true,
+      callback = stop_refresh_timer,
+    })
+  end
 
   load_issues(false)   -- no loading indicator on initial load
   load_monitored_set() -- background fetch; re-renders the indicator when ready
