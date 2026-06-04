@@ -5,11 +5,15 @@
 ## Features
 
 - Supports multiple MantisBT hosts
-- Fully reactive UI powered by **nui-components**
+- Built with **nui.nvim** and **nui-components**
 - Cross-platform (Linux, macOS, Windows)
 
 ### Issues List
 
+- Open as a centered floating window or a native split panel (`layout`), toggleable at runtime with `<C-s>`
+- Smart split placement: `split_position = 'auto'` docks on the **right** on landscape screens and the **bottom** on portrait
+- Single instance: re-opening the list focuses the existing panel instead of stacking duplicates
+- Auto-refreshes on a configurable interval, preserving your cursor row and selection
 - Configurable issue properties and column widths
 - Pagination for large result sets
 - Filter by all, assigned, reported, monitored, or unassigned issues
@@ -180,8 +184,21 @@ require('mantis').setup({
   view_issues = {
     default_filter = 'all', -- 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
+    -- Silently re-fetch the list on this interval (seconds); 0/false disables.
+    -- Preserves cursor row and selection.
+    auto_refresh_interval = 120,
+    -- Window layout: 'float' (centered popup) or 'split' (docked panel).
+    layout = 'float',
+    -- Where the docked panel sits when layout = 'split'.
+    --   'auto'  -> 'right' on landscape screens, 'bottom' on portrait
+    --   'right' | 'left' | 'bottom' -> force a side
+    split_position = 'auto',
+    split_size = 0.40, -- fraction of the screen the panel occupies
+    -- Cell height:width ratio used to infer orientation for 'auto'
+    -- (terminal cells are ~twice as tall as wide).
+    split_cell_aspect = 2.0,
     ui = {
-      -- window size (supports percentages like "90%" or absolute numbers)
+      -- window size for the float layout (percentages like "90%" or numbers)
       width = "90%",
       height = "80%",
       max_width = 180,
@@ -213,6 +230,7 @@ require('mantis').setup({
       monitor = "m",
       filter = "F",
       toggle_group = "<C-g>",
+      toggle_layout = "<C-s>",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -280,6 +298,7 @@ require('mantis').setup({
 | `m` | Toggle monitoring an issue (monitored issues show a 👁 indicator) |
 | `F` | Filter issues |
 | `<C-g>` | Toggle group by project |
+| `<C-s>` | Toggle float/split layout |
 | `r` | Refresh |
 | `L` | Next page |
 | `H` | Previous page |

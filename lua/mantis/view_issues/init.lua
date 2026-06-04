@@ -10,6 +10,11 @@ local config = require("mantis.config")
 local util = require("mantis.util")
 local helper = require("mantis.view_issues.helper")
 
+-- The currently-open list window (nui Split|Popup), or nil. Tracked at module
+-- scope so a second open focuses the existing instance instead of stacking a
+-- duplicate. Cleared when the list buffer is wiped.
+local active_window = nil
+
 local function get_current_filter()
   local options = config.options.view_issues
   return state.current_filter or options.default_filter or 'all'
@@ -96,6 +101,13 @@ local function create_window(options, api_name)
 end
 
 function M.render()
+  -- Single instance: if the list is already open, focus it instead of opening
+  -- a second one.
+  if active_window and active_window.winid and vim.api.nvim_win_is_valid(active_window.winid) then
+    vim.api.nvim_set_current_win(active_window.winid)
+    return
+  end
+
   local options = config.options.view_issues
   local keymap = options.keymap
 
@@ -850,6 +862,7 @@ function M.render()
   local api_name = state.api.name or state.api.url
   window = create_window(options, api_name)
   window:mount()
+  active_window = window
 
   -- Record the real text width of the panel so column sizing fills it exactly.
   state.list_width = vim.api.nvim_win_get_width(window.winid)
@@ -1022,12 +1035,20 @@ function M.render()
       end
       auto_refresh()
     end))
-    vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {
-      buffer = window.bufnr,
-      once = true,
-      callback = stop_refresh_timer,
-    })
   end
+
+  -- Tear down when the list buffer goes away: stop the timer and release the
+  -- single-instance handle so the next open creates a fresh list.
+  vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {
+    buffer = window.bufnr,
+    once = true,
+    callback = function()
+      stop_refresh_timer()
+      if active_window == window then
+        active_window = nil
+      end
+    end,
+  })
 
   load_issues(false)   -- no loading indicator on initial load
   load_monitored_set() -- background fetch; re-renders the indicator when ready
