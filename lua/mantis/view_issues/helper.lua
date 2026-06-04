@@ -25,31 +25,43 @@ end
 -- Cache for created highlight groups (avoids redundant nvim_set_hl calls)
 local hl_cache = {}
 
--- Calculate summary column width based on available space
+-- Calculate the summary column width so a rendered row fills the panel exactly.
+-- Mirrors the exact cell budget consumed by prepare_node:
+--   checkbox "[ ] " (4) + monitor indicator (icon width + 1) + tree prefix
+--   (4 when grouped, 0 when flat) + each configurable column ("%-Ws " => w + 1,
+--   except `updated` which has no trailing space) + the summary's own trailing
+--   space (1). `get_effective_width()` is the real text width of the window, so
+--   there is no border to account for.
 function M.get_summary_width()
   local columns = options.ui.columns
   local width = get_effective_width()
 
-  -- Fixed overhead: checkbox (4) + tree prefix (4) + border (4) + padding
-  local overhead = 13
-
-  -- Monitor indicator column: icon display width + 1 separator (matches
-  -- prepare_node). Without this the summary is sized too wide and the last
-  -- character of the line gets clipped by the window border.
   local monitor_icon = config.options.monitor_icon or ""
-  overhead = overhead + math.max(1, vim.fn.strdisplaywidth(monitor_icon)) + 1
+  local monitor_w = math.max(1, vim.fn.strdisplaywidth(monitor_icon)) + 1
 
-  -- Sum of fixed column widths (each has 1 space after)
+  local grouped = state.grouped ~= false
+  local prefix = 4 + monitor_w + (grouped and 4 or 0)
+
   local fixed_width = 0
   for col, w in pairs(columns) do
     if col ~= "summary" and w then
-      fixed_width = fixed_width + w + 1  -- +1 for space after each column
+      -- `updated` is the last column and renders without a trailing space.
+      fixed_width = fixed_width + w + (col == "updated" and 0 or 1)
     end
   end
 
-  -- Remaining space for summary
-  local summary_width = width - overhead - fixed_width
-  -- Clamp between 20 and 99 (Lua format specifier width limit)
+  -- The priority column holds an emoji that renders ~2 display cells wide while
+  -- the configured column width is typically 1; reserve the extra width so the
+  -- row doesn't overflow the panel by a cell.
+  if columns.priority then
+    local emojis = config.options.priority_emojis or {}
+    local emoji = emojis.normal or ""
+    fixed_width = fixed_width + math.max(0, vim.fn.strdisplaywidth(emoji) - columns.priority)
+  end
+
+  -- Reserve the summary's own trailing space ("%-Ws ").
+  local summary_width = width - prefix - fixed_width - 1
+  -- Clamp between 20 and 99 (Lua format specifier width limit).
   return math.max(20, math.min(99, summary_width))
 end
 
