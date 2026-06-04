@@ -61,7 +61,7 @@ M.options = {
     --   'auto'   -> 'right' on landscape screens, 'bottom' on portrait
     --   'right' | 'left' | 'bottom' -> force a side
     split_position = 'auto',
-    split_size = 0.40, -- fraction of the screen the panel occupies
+    split_size = 0.30, -- fraction of the screen the panel occupies
     -- Cell height:width ratio used to infer screen orientation for 'auto'.
     -- Terminal cells are ~twice as tall as wide; tune for unusual fonts.
     split_cell_aspect = 2.0,
