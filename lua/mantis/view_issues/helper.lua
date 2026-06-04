@@ -61,8 +61,8 @@ function M.get_summary_width()
 
   -- Reserve the summary's own trailing space ("%-Ws ").
   local summary_width = width - prefix - fixed_width - 1
-  -- Clamp between 20 and 99 (Lua format specifier width limit).
-  return math.max(20, math.min(99, summary_width))
+  -- Floor at 20; no upper clamp so the summary flexes to fill wide panels.
+  return math.max(20, summary_width)
 end
 
 function M.prepare_node(node, line, component)
@@ -162,10 +162,13 @@ function M.prepare_node(node, line, component)
       line:append(severity)
     end
 
-    -- Summary column uses dynamic width (capped at 99 for Lua format limit)
-    local summary_width = math.min(columns.summary or M.get_summary_width(), 99)
-    local summary = n.text(string.format("%-" .. summary_width .. "s ",
-      util.truncate(issue.summary, summary_width)))
+    -- Summary column uses dynamic width to fill the panel. Pad manually instead
+    -- of string.format("%-Ws") since Lua only accepts a 2-digit width specifier,
+    -- which would cap wide panels at 99 cells and leave the row short.
+    local summary_width = columns.summary or M.get_summary_width()
+    local summary_text = util.truncate(issue.summary, summary_width)
+    local pad = math.max(0, summary_width - vim.fn.strdisplaywidth(summary_text))
+    local summary = n.text(summary_text .. string.rep(" ", pad) .. " ")
     line:append(summary)
 
     if columns.updated then
