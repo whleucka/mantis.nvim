@@ -59,10 +59,23 @@ function M.render(issue_id)
   local popup_width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width)
   local popup_height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height)
 
+  -- Remember the window we were launched from (the issues list) so focus can
+  -- be returned there when the popup closes, instead of falling through to
+  -- whatever window happens to sit behind it.
+  local origin_win = vim.api.nvim_get_current_win()
+
   fetch_issue(issue_id, function(issue)
     if not issue then
       vim.notify("Failed to fetch issue #" .. issue_id, vim.log.levels.ERROR)
       return
+    end
+
+    local function restore_focus()
+      vim.schedule(function()
+        if origin_win and vim.api.nvim_win_is_valid(origin_win) then
+          pcall(vim.api.nvim_set_current_win, origin_win)
+        end
+      end)
     end
 
     local popup = Popup({
@@ -96,6 +109,7 @@ function M.render(issue_id)
     popup:mount()
     popup:on(event.WinClosed, function()
       popup:unmount()
+      restore_focus()
     end)
 
     render_content(popup, issue, popup_width)
@@ -104,6 +118,7 @@ function M.render(issue_id)
 
     popup:map("n", keymap.quit, function()
       popup:unmount()
+      restore_focus()
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.refresh, function()

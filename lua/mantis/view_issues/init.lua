@@ -688,7 +688,6 @@ function M.render()
   end
 
   local body = function()
-    local current_node_type = nil  -- Track current node type for highlighting
     local api_name = state.api.name or state.api.url
 
     issue_table = n.tree({
@@ -717,7 +716,6 @@ function M.render()
       end,
       prepare_node = helper.prepare_node,
       on_change = function(node, component)
-        current_node_type = node and node.type or nil
         if node and node.type == 'issue' then
           signal.selected = node.issue
         end
@@ -728,15 +726,39 @@ function M.render()
 
         local bufnr = component.bufnr
         local ns_id = vim.api.nvim_create_namespace("mantis_selection")
-        vim.api.nvim_set_hl(0, "MantisSelection", { link = "CursorLine", default = true })
 
+        -- The tree forces `cursorline = true` and remaps CursorLine to its own
+        -- (undefined, hence invisible) NodeFocused group inside the window's
+        -- highlight namespace. So a highlight group that links to CursorLine
+        -- gets remapped to that invisible group too. Give MantisSelection an
+        -- explicit background instead so it renders independently of that
+        -- remap. Re-derive it on colorscheme changes to track the theme.
+        local function ensure_hl()
+          local cl = vim.api.nvim_get_hl(0, { name = "CursorLine" })
+          if cl.bg or cl.ctermbg then
+            vim.api.nvim_set_hl(0, "MantisSelection", { bg = cl.bg, ctermbg = cl.ctermbg })
+          else
+            vim.api.nvim_set_hl(0, "MantisSelection", { link = "Visual" })
+          end
+        end
+        ensure_hl()
+
+        -- Highlight the current row, but only when it is an issue row. The node
+        -- type is read straight from the tree at the cursor line so it stays
+        -- correct for every cursor movement (mouse, gg/G, search), not just the
+        -- j/k actions that fire on_change.
         local function update_selection_indicator()
+          if not vim.api.nvim_buf_is_valid(bufnr) then return end
           vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
-          if current_node_type == 'issue' then
-            local cursor = vim.api.nvim_win_get_cursor(0)
-            local line = cursor[1] - 1
-            vim.api.nvim_buf_set_extmark(bufnr, ns_id, line, 0, {
+          local winid = component.winid
+          if not winid or not vim.api.nvim_win_is_valid(winid) then return end
+          local line = vim.api.nvim_win_get_cursor(winid)[1]
+          local tree = component:get_tree()
+          local node = tree and tree:get_node(line)
+          if node and node.type == 'issue' then
+            vim.api.nvim_buf_set_extmark(bufnr, ns_id, line - 1, 0, {
               line_hl_group = "MantisSelection",
+              strict = false,
             })
           end
         end
@@ -745,6 +767,13 @@ function M.render()
         vim.api.nvim_create_autocmd("CursorMoved", {
           buffer = bufnr,
           callback = update_selection_indicator,
+        })
+        vim.api.nvim_create_autocmd("ColorScheme", {
+          buffer = bufnr,
+          callback = function()
+            ensure_hl()
+            update_selection_indicator()
+          end,
         })
 
         vim.keymap.set("n", keymap.create_issue, function()
