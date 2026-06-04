@@ -55,6 +55,7 @@ local function get_help_groups()
       title = "General",
       items = {
         { key = "toggle_group", label = "Toggle grouping" },
+        { key = "toggle_layout", label = "Toggle float/split" },
         { key = "refresh",      label = "Refresh" },
         { key = "help",         label = "Close help" },
         { key = "quit",         label = "Quit" },

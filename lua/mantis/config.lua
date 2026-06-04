@@ -50,6 +50,18 @@ M.options = {
   view_issues = {
     default_filter = 'all', -- default filter: 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
+    -- Window layout: 'float' (centered popup, default) or 'split' (panel docked
+    -- flush to a screen edge). 'split' is a full-height/width floating panel; it
+    -- overlays rather than reflows other windows.
+    layout = 'float',
+    -- Where the docked panel sits when layout = 'split'.
+    --   'auto'   -> 'right' on landscape screens, 'bottom' on portrait
+    --   'right' | 'left' | 'bottom' -> force a side
+    split_position = 'auto',
+    split_size = 0.40, -- fraction of the screen the panel occupies
+    -- Cell height:width ratio used to infer screen orientation for 'auto'.
+    -- Terminal cells are ~twice as tall as wide; tune for unusual fonts.
+    split_cell_aspect = 2.0,
     ui = {
       -- window size (supports percentages like "90%" or absolute numbers)
       width = "90%",
@@ -83,6 +95,7 @@ M.options = {
       monitor = "m",
       filter = "F",
       toggle_group = "<C-g>",
+      toggle_layout = "<C-s>",
       help = "?",
       refresh = "r",
       quit = "q",

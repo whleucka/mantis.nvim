@@ -12,6 +12,59 @@ local function get_current_filter()
   return state.current_filter or options.default_filter or 'all'
 end
 
+-- The active layout, falling back to the configured default. Persisted in
+-- `state` so a runtime toggle survives a close/reopen.
+local function get_current_layout()
+  local options = config.options.view_issues
+  return state.layout or options.layout or 'float'
+end
+
+-- Resolve the docked side for 'split' layout. 'auto' infers orientation from
+-- the editor's cell dimensions: a terminal cell is ~`split_cell_aspect` times
+-- taller than wide, so a physically landscape screen has columns >= aspect*lines.
+local function resolve_split_position(options)
+  local pos = options.split_position or 'auto'
+  if pos ~= 'auto' then
+    return pos
+  end
+  local aspect = options.split_cell_aspect or 2.0
+  local landscape = vim.o.columns >= (aspect * vim.o.lines)
+  return landscape and 'right' or 'bottom'
+end
+
+-- Compute renderer geometry for the active layout. For 'float' we keep the
+-- existing centered behaviour (nil position/relative => renderer defaults). For
+-- 'split' we dock a full-height/width panel flush to a screen edge.
+local function resolve_layout_geometry(options)
+  if get_current_layout() ~= 'split' then
+    return {
+      width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width),
+      height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height),
+    }
+  end
+
+  local size = options.split_size or 0.40
+  local position = resolve_split_position(options)
+  local relative = "editor"
+
+  if position == 'bottom' then
+    return {
+      width = vim.o.columns - 2,
+      height = math.floor(vim.o.lines * size),
+      position = { row = "100%", col = 0 },
+      relative = relative,
+    }
+  end
+
+  -- 'right' / 'left': full-height vertical panel.
+  return {
+    width = math.floor(vim.o.columns * size),
+    height = vim.o.lines - 2,
+    position = { row = 0, col = (position == 'left') and 0 or "100%" },
+    relative = relative,
+  }
+end
+
 function M.render()
   local options = config.options.view_issues
 
@@ -22,9 +75,12 @@ function M.render()
     issue_nodes = {},
   })
 
+  local geo = resolve_layout_geometry(options)
   local renderer = n.create_renderer({
-    width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width),
-    height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height),
+    width = geo.width,
+    height = geo.height,
+    position = geo.position, -- nil for float => renderer default "50%"
+    relative = geo.relative, -- nil for float => renderer default "editor"
   })
 
   local issues_cache = {}
@@ -856,6 +912,13 @@ function M.render()
           build_signal_nodes()
           local status = signal.grouped:get_value() and "on" or "off"
           vim.notify("Group by project: " .. status, vim.log.levels.INFO)
+        end, { buffer = true, nowait = true })
+
+        vim.keymap.set("n", keymap.toggle_layout, function()
+          state.layout = (get_current_layout() == 'split') and 'float' or 'split'
+          renderer:close()
+          M.render()
+          vim.notify("Layout: " .. state.layout, vim.log.levels.INFO)
         end, { buffer = true, nowait = true })
 
         vim.keymap.set("n", keymap.refresh, function()
