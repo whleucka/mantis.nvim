@@ -6,8 +6,14 @@ local util = require("mantis.util")
 local config = require("mantis.config")
 local options = config.options.view_issues
 
--- Calculate the effective window width from config (handles percentages)
+-- Calculate the effective window width used to size columns. When the list is
+-- open, the renderer records the actual window width in `state.list_width` so
+-- columns fill the real panel (full-width in split mode) rather than the
+-- configured float percentage. Falls back to the config value otherwise.
 local function get_effective_width()
+  if state.list_width then
+    return state.list_width
+  end
   local width = options.ui.width
   if type(width) == "string" and width:match("%%$") then
     local pct = tonumber(width:match("^(%d+)")) or 90

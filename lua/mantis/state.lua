@@ -6,6 +6,7 @@ local M = {
   current_filter = nil, -- persists filter across view_issues sessions
   grouped = true, -- persists grouped view across view_issues sessions
   layout = nil, -- active view_issues layout ('float'|'split'); nil falls back to config
+  list_width = nil, -- actual view_issues window width; drives column sizing
 
   -- Per-project caches (cleared on host switch)
   ---@type table<number, table[]> project_id -> users array

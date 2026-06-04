@@ -76,6 +76,9 @@ function M.render()
   })
 
   local geo = resolve_layout_geometry(options)
+  -- Record the real window width so column sizing (helper.get_effective_width)
+  -- fills the actual panel instead of the configured float percentage.
+  state.list_width = geo.width
   local renderer = n.create_renderer({
     width = geo.width,
     height = geo.height,
