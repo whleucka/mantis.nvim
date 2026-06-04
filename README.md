@@ -373,10 +373,36 @@ nvim
 - If using HTTPS, ensure SSL certificates are valid
 
 ## Screenshots
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/51e1572c-8642-4210-bf91-56c94a3f6029" />
+  <figcaption style="text-align: center;"><strong>View issues (split)</strong></figcaption>
+</figure>
+</div>
+<br><br>
 
-<img width="1740" height="963" alt="image" src="https://github.com/user-attachments/assets/50d83bcb-5e80-4874-b6a6-53d4ce19d4ec" />
-<img width="922" height="696" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
-<img width="894" height="649" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/50d83bcb-5e80-4874-b6a6-53d4ce19d4ec" />
+  <figcaption style="text-align: center"><strong>View issues (float)</strong></figcaption>
+</figure>
+</div>
+<br><br>
+
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
+  <figcaption style="text-align: center"><strong>View issue</strong></figcaption>
+</figure>
+</div>
+<br><br>
+
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
+  <figcaption style="text-align: center"><strong>Create issue</strong></figcaption>
+</figure>
+</div>
 
 ## License
 
