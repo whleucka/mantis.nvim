@@ -28,6 +28,9 @@ M.options = {
     }
   },
   view_issue = {
+    -- Silently re-fetch the open issue on this interval (seconds); 0/false
+    -- disables. Preserves cursor position.
+    auto_refresh_interval = 120,
     ui = {
       width = 80,
       height = 30,

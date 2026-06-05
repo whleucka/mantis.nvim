@@ -43,8 +43,11 @@ end
 --- Fetch a single issue without blocking the editor.
 ---@param issue_id number
 ---@param callback fun(issue: table|nil)
-local function fetch_issue(issue_id, callback)
-  vim.notify("Loading issue #" .. issue_id .. "...", vim.log.levels.INFO)
+---@param silent? boolean suppress the "Loading..." notification (used by auto-refresh)
+local function fetch_issue(issue_id, callback, silent)
+  if not silent then
+    vim.notify("Loading issue #" .. issue_id .. "...", vim.log.levels.INFO)
+  end
   state.api:get_issue(issue_id, function(ok, res)
     if ok and res and res.issues and res.issues[1] then
       callback(res.issues[1])
@@ -107,16 +110,52 @@ function M.render(issue_id)
     })
 
     popup:mount()
+
+    -- Auto-refresh on an interval (config.auto_refresh_interval seconds;
+    -- 0/false disables). The libuv timer is torn down when the popup closes so
+    -- it never fires against a stale buffer or leaks across reopens.
+    local uv = vim.uv or vim.loop
+    local refresh_timer
+    local function stop_refresh_timer()
+      if refresh_timer then
+        pcall(function()
+          refresh_timer:stop()
+          if not refresh_timer:is_closing() then refresh_timer:close() end
+        end)
+        refresh_timer = nil
+      end
+    end
+
     popup:on(event.WinClosed, function()
+      stop_refresh_timer()
       popup:unmount()
       restore_focus()
     end)
+
+    local interval = options.auto_refresh_interval
+    if interval and interval > 0 then
+      refresh_timer = uv.new_timer()
+      local ms = math.floor(interval * 1000)
+      refresh_timer:start(ms, ms, vim.schedule_wrap(function()
+        if not (popup.winid and vim.api.nvim_win_is_valid(popup.winid)) then
+          stop_refresh_timer()
+          return
+        end
+        fetch_issue(issue_id, function(refreshed_issue)
+          if refreshed_issue and popup.winid and vim.api.nvim_win_is_valid(popup.winid) then
+            issue = refreshed_issue
+            render_content(popup, issue, popup_width)
+          end
+        end, true) -- silent: no "Loading..."/"refreshed" notifications
+      end))
+    end
 
     render_content(popup, issue, popup_width)
 
     local keymap = options.keymap
 
     popup:map("n", keymap.quit, function()
+      stop_refresh_timer()
       popup:unmount()
       restore_focus()
     end, { noremap = true, silent = true })
