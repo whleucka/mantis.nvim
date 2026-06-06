@@ -8,6 +8,8 @@ local helper = require("mantis.view_issue.helper")
 local add_note = require("mantis.add_note")
 local util = require("mantis.util")
 
+local ns = vim.api.nvim_create_namespace("mantis_issue")
+
 local function render_content(popup, issue, width)
   local formatted = helper.format_issue(issue, width)
 
@@ -25,19 +27,34 @@ local function render_content(popup, issue, width)
   vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
   vim.bo[popup.bufnr].modifiable = false
 
+  -- Clear prior highlights so a refresh/re-render does not stack extmarks.
+  vim.api.nvim_buf_clear_namespace(popup.bufnr, ns, 0, -1)
   for _, hl_data in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(popup.bufnr, -1, hl_data.hl, hl_data.line - 1, 0, -1)
+    local row = hl_data.line - 1
+    vim.api.nvim_buf_set_extmark(popup.bufnr, ns, row, 0, {
+      end_row = row,
+      end_col = #(lines[hl_data.line] or ""),
+      hl_group = hl_data.hl,
+      strict = false,
+    })
   end
 end
 
-local function fetch_issue(issue_id)
-  local ok, res = util.with_loading("Loading issue #" .. issue_id, function()
-    return state.api:get_issue(issue_id)
-  end)
-  if ok and res and res.issues and res.issues[1] then
-    return res.issues[1]
+--- Fetch a single issue without blocking the editor.
+---@param issue_id number
+---@param callback fun(issue: table|nil)
+---@param silent? boolean suppress the "Loading..." notification (used by auto-refresh)
+local function fetch_issue(issue_id, callback, silent)
+  if not silent then
+    vim.notify("Loading issue #" .. issue_id .. "...", vim.log.levels.INFO)
   end
-  return nil
+  state.api:get_issue(issue_id, function(ok, res)
+    if ok and res and res.issues and res.issues[1] then
+      callback(res.issues[1])
+    else
+      callback(nil)
+    end
+  end)
 end
 
 function M.render(issue_id)
@@ -45,73 +62,171 @@ function M.render(issue_id)
   local popup_width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width)
   local popup_height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height)
 
-  local issue = fetch_issue(issue_id)
+  -- Remember the window we were launched from (the issues list) so focus can
+  -- be returned there when the popup closes, instead of falling through to
+  -- whatever window happens to sit behind it.
+  local origin_win = vim.api.nvim_get_current_win()
 
-  if not issue then
-    vim.notify("Failed to fetch issue #" .. issue_id, vim.log.levels.ERROR)
-    return
-  end
+  fetch_issue(issue_id, function(issue)
+    if not issue then
+      vim.notify("Failed to fetch issue #" .. issue_id, vim.log.levels.ERROR)
+      return
+    end
 
-  local popup = Popup({
-    enter = true,
-    focusable = true,
-    border = {
-      style = "rounded",
-      text = {
-        top = " Issue #" .. issue_id .. " ",
-        top_align = "left",
-        bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add note ",
-        bottom_align = "right",
+    local function restore_focus()
+      vim.schedule(function()
+        if origin_win and vim.api.nvim_win_is_valid(origin_win) then
+          pcall(vim.api.nvim_set_current_win, origin_win)
+        end
+      end)
+    end
+
+    local popup = Popup({
+      enter = true,
+      focusable = true,
+      border = {
+        style = "rounded",
+        text = {
+          top = " Issue #" .. issue_id .. " ",
+          top_align = "left",
+          bottom = " " .. options.keymap.quit .. ": quit | " .. options.keymap.refresh .. ": refresh | " .. options.keymap.add_note .. ": add | " .. options.keymap.delete_note .. ": delete note ",
+          bottom_align = "right",
+        },
       },
-    },
-    position = "50%",
-    size = {
-      width = popup_width,
-      height = popup_height,
-    },
-    zindex = 200,
-    win_options = {
-      wrap = true,
-      cursorline = false,
-    },
-    buf_options = {
-      modifiable = false,
-      filetype = "mantis-issue",
-    },
-  })
+      position = "50%",
+      size = {
+        width = popup_width,
+        height = popup_height,
+      },
+      zindex = 200,
+      win_options = {
+        wrap = true,
+        cursorline = false,
+      },
+      buf_options = {
+        modifiable = false,
+        filetype = "mantis-issue",
+      },
+    })
 
-  popup:mount()
-  popup:on(event.BufLeave, function()
-    popup:unmount()
-  end)
+    popup:mount()
 
-  render_content(popup, issue, popup_width)
+    -- Auto-refresh on an interval (config.auto_refresh_interval seconds;
+    -- 0/false disables). The libuv timer is torn down when the popup closes so
+    -- it never fires against a stale buffer or leaks across reopens.
+    local uv = vim.uv or vim.loop
+    local refresh_timer
+    local function stop_refresh_timer()
+      if refresh_timer then
+        pcall(function()
+          refresh_timer:stop()
+          if not refresh_timer:is_closing() then refresh_timer:close() end
+        end)
+        refresh_timer = nil
+      end
+    end
 
-  local function set_keymaps()
+    popup:on(event.WinClosed, function()
+      stop_refresh_timer()
+      popup:unmount()
+      restore_focus()
+    end)
+
+    local interval = options.auto_refresh_interval
+    if interval and interval > 0 then
+      refresh_timer = uv.new_timer()
+      local ms = math.floor(interval * 1000)
+      refresh_timer:start(ms, ms, vim.schedule_wrap(function()
+        if not (popup.winid and vim.api.nvim_win_is_valid(popup.winid)) then
+          stop_refresh_timer()
+          return
+        end
+        fetch_issue(issue_id, function(refreshed_issue)
+          if refreshed_issue and popup.winid and vim.api.nvim_win_is_valid(popup.winid) then
+            issue = refreshed_issue
+            render_content(popup, issue, popup_width)
+          end
+        end, true) -- silent: no "Loading..."/"refreshed" notifications
+      end))
+    end
+
+    render_content(popup, issue, popup_width)
+
     local keymap = options.keymap
 
     popup:map("n", keymap.quit, function()
+      stop_refresh_timer()
       popup:unmount()
+      restore_focus()
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.refresh, function()
-      local refreshed_issue = fetch_issue(issue_id)
-      if refreshed_issue then
-        issue = refreshed_issue
-        render_content(popup, issue, popup_width)
-        vim.notify("Issue #" .. issue_id .. " refreshed", vim.log.levels.INFO)
-      else
-        vim.notify("Failed to refresh issue #" .. issue_id, vim.log.levels.ERROR)
-      end
+      fetch_issue(issue_id, function(refreshed_issue)
+        if refreshed_issue then
+          issue = refreshed_issue
+          render_content(popup, issue, popup_width)
+          vim.notify("Issue #" .. issue_id .. " refreshed", vim.log.levels.INFO)
+        else
+          vim.notify("Failed to refresh issue #" .. issue_id, vim.log.levels.ERROR)
+        end
+      end)
     end, { noremap = true, silent = true })
 
     popup:map("n", keymap.add_note, function()
       add_note.render(issue_id, function()
-        local refreshed_issue = fetch_issue(issue_id)
-        if refreshed_issue then
-          issue = refreshed_issue
-          render_content(popup, issue, popup_width)
+        fetch_issue(issue_id, function(refreshed_issue)
+          if refreshed_issue then
+            issue = refreshed_issue
+            render_content(popup, issue, popup_width)
+          end
+        end)
+      end)
+    end, { noremap = true, silent = true })
+
+    popup:map("n", keymap.delete_note, function()
+      if not issue.notes or #issue.notes == 0 then
+        vim.notify("No notes to delete.", vim.log.levels.WARN)
+        return
+      end
+
+      vim.ui.select(issue.notes, {
+        prompt = "Select a note to delete",
+        format_item = function(note)
+          local reporter = note.reporter and (note.reporter.real_name or note.reporter.name) or "Unknown"
+          local preview = (note.text or ""):gsub("\n", " ")
+          if #preview > 60 then
+            preview = preview:sub(1, 57) .. "..."
+          end
+          return string.format("[%s] %s", reporter, preview)
+        end,
+      }, function(note)
+        if not note then
+          return
         end
+
+        vim.ui.input({
+          prompt = "Delete this note? (y/n) ",
+          default = "n",
+        }, function(input)
+          if not input or input:lower() ~= "y" then
+            vim.notify("Deletion cancelled.", vim.log.levels.INFO)
+            return
+          end
+
+          state.api:delete_issue_note(issue_id, note.id, function(ok)
+            if ok then
+              vim.notify("Note deleted.", vim.log.levels.INFO)
+              fetch_issue(issue_id, function(refreshed_issue)
+                if refreshed_issue then
+                  issue = refreshed_issue
+                  render_content(popup, issue, popup_width)
+                end
+              end)
+            else
+              vim.notify("Failed to delete note.", vim.log.levels.ERROR)
+            end
+          end)
+        end)
       end)
     end, { noremap = true, silent = true })
 
@@ -151,9 +266,7 @@ function M.render(issue_id)
     popup:map("n", keymap.goto_top, function()
       vim.api.nvim_win_set_cursor(popup.winid, { 1, 0 })
     end, { noremap = true, silent = true })
-  end
-
-  set_keymaps()
+  end)
 end
 
 return M

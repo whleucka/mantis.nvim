@@ -1,37 +1,185 @@
 local M = {}
 
 local ui = require("mantis.ui")
-local n = require("nui-components")
+local NuiTree = require("nui.tree")
+local NuiLine = require("nui.line")
+local Split = require("nui.split")
+local Popup = require("nui.popup")
 local state = require("mantis.state")
 local config = require("mantis.config")
 local util = require("mantis.util")
 local helper = require("mantis.view_issues.helper")
+
+-- The currently-open list window (nui Split|Popup), or nil. Tracked at module
+-- scope so a second open focuses the existing instance instead of stacking a
+-- duplicate. Cleared when the list buffer is wiped.
+local active_window = nil
 
 local function get_current_filter()
   local options = config.options.view_issues
   return state.current_filter or options.default_filter or 'all'
 end
 
-function M.render()
+-- The active layout, falling back to the configured default. Persisted in
+-- `state` so a runtime toggle survives a close/reopen.
+local function get_current_layout()
   local options = config.options.view_issues
+  return state.layout or options.layout or 'float'
+end
 
-  local signal = n.create_signal({
-    selected = nil,
-    mode = get_current_filter(),
-    grouped = state.grouped,
-    issue_nodes = {},
-  })
+-- Resolve the docked side for 'split' layout. 'auto' infers orientation from
+-- the editor's cell dimensions: a terminal cell is ~`split_cell_aspect` times
+-- taller than wide, so a physically landscape screen has columns >= aspect*lines.
+local function resolve_split_position(options)
+  local pos = options.split_position or 'auto'
+  if pos ~= 'auto' then
+    return pos
+  end
+  local aspect = options.split_cell_aspect or 2.0
+  local landscape = vim.o.columns >= (aspect * vim.o.lines)
+  return landscape and 'right' or 'bottom'
+end
 
-  local renderer = n.create_renderer({
-    width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width),
-    height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height),
+-- Create the host window for the list. A real `nui.Split` (which reflows the
+-- other windows) for 'split', or a centered `nui.Popup` for 'float'. Both expose
+-- the same `mount`/`unmount`/`bufnr`/`winid` surface, so the rest of the view is
+-- layout-agnostic.
+local function create_window(options, api_name)
+  local keymap = options.keymap
+  local title = "MantisBT Issues [" .. api_name .. "]"
+
+  if get_current_layout() == 'split' then
+    local position = resolve_split_position(options)
+    local frac = options.split_size or 0.40
+    local size
+    if position == 'top' or position == 'bottom' then
+      size = math.max(3, math.floor(vim.o.lines * frac))
+    else
+      size = math.max(20, math.floor(vim.o.columns * frac))
+    end
+    return Split({
+      relative = "editor",
+      position = position,
+      size = size,
+      enter = true,
+      win_options = {
+        cursorline = false,
+        number = false,
+        relativenumber = false,
+        signcolumn = "no",
+        -- Splits have no float-style border; surface the title and help hint
+        -- in the winbar instead.
+        winbar = " " .. title .. "%= " .. keymap.help .. " help ",
+      },
+    })
+  end
+
+  return Popup({
+    enter = true,
+    focusable = true,
+    border = {
+      style = "rounded",
+      text = {
+        top = " " .. title .. " ",
+        top_align = "left",
+        bottom = " " .. keymap.help .. " help ",
+        bottom_align = "right",
+      },
+    },
+    position = "50%",
+    size = {
+      width = util.resolve_dimension(options.ui.width, vim.o.columns, options.ui.max_width),
+      height = util.resolve_dimension(options.ui.height, vim.o.lines, options.ui.max_height),
+    },
+    win_options = {
+      cursorline = false,
+      number = false,
+      relativenumber = false,
+      signcolumn = "no",
+    },
   })
+end
+
+function M.render()
+  -- Single instance: if the list is already open, focus it instead of opening
+  -- a second one.
+  if active_window and active_window.winid and vim.api.nvim_win_is_valid(active_window.winid) then
+    vim.api.nvim_set_current_win(active_window.winid)
+    return
+  end
+
+  local options = config.options.view_issues
+  local keymap = options.keymap
+
+  -- Forward declarations so the action functions below can close over these
+  -- before the window/tree are actually created.
+  local window           -- nui Split|Popup host
+  local tree             -- NuiTree rendered into window.bufnr
+  local refresh_list     -- rebuild + re-render the tree from issues_cache
+  local reset_tree_focus -- snap cursor to the first row
+  local update_selection_indicator
+  local get_selected_issue
 
   local issues_cache = {}
 
-  local function build_signal_nodes()
-    local grouped = signal.grouped:get_value()
-    signal.issue_nodes = helper.build_nodes(issues_cache, grouped)
+  local selection_ns = vim.api.nvim_create_namespace("mantis_selection")
+  local tree_ns = vim.api.nvim_create_namespace("mantis_tree")
+
+  -- The list buffer is non-editable; the row highlight uses an explicit
+  -- background so it renders regardless of any window highlight namespace.
+  -- Re-derived on colorscheme changes to track the theme.
+  local function ensure_hl()
+    local cl = vim.api.nvim_get_hl(0, { name = "CursorLine" })
+    if cl.bg or cl.ctermbg then
+      vim.api.nvim_set_hl(0, "MantisSelection", { bg = cl.bg, ctermbg = cl.ctermbg })
+    else
+      vim.api.nvim_set_hl(0, "MantisSelection", { link = "Visual" })
+    end
+  end
+
+  -- Read the node under the cursor in the list window (works regardless of which
+  -- window is currently focused).
+  local function current_node()
+    if not tree or not window or not window.winid then return nil end
+    if not vim.api.nvim_win_is_valid(window.winid) then return nil end
+    local line = vim.api.nvim_win_get_cursor(window.winid)[1]
+    return tree:get_node(line)
+  end
+
+  -- Highlight the current row, but only when it is an issue row (project/empty
+  -- rows stay unhighlighted).
+  update_selection_indicator = function()
+    if not window or not vim.api.nvim_buf_is_valid(window.bufnr) then return end
+    vim.api.nvim_buf_clear_namespace(window.bufnr, selection_ns, 0, -1)
+    local node = current_node()
+    if node and node.type == 'issue' then
+      local line = vim.api.nvim_win_get_cursor(window.winid)[1]
+      vim.api.nvim_buf_set_extmark(window.bufnr, selection_ns, line - 1, 0, {
+        line_hl_group = "MantisSelection",
+        strict = false,
+      })
+    end
+  end
+
+  refresh_list = function()
+    if not tree then return end
+    tree:set_nodes(helper.build_nodes(issues_cache, state.grouped))
+    tree:render()
+    update_selection_indicator()
+  end
+
+  -- A fresh list renders over an initially-empty buffer; snap focus back to the
+  -- first row so navigation starts at the top. Scheduled so it runs after the
+  -- render that fills the buffer.
+  reset_tree_focus = function()
+    if not window then return end
+    vim.schedule(function()
+      local winid = window.winid
+      if winid and vim.api.nvim_win_is_valid(winid) then
+        pcall(vim.api.nvim_win_set_cursor, winid, { 1, 0 })
+        update_selection_indicator()
+      end
+    end)
   end
 
   local function update_cache_issue(updated_issue)
@@ -44,7 +192,7 @@ function M.render()
     table.sort(issues_cache, function(a, b)
       return a.updated_at > b.updated_at
     end)
-    build_signal_nodes()
+    refresh_list()
   end
 
   local function remove_cache_issue(issue_id)
@@ -54,166 +202,215 @@ function M.render()
         break
       end
     end
-    build_signal_nodes()
+    refresh_list()
   end
 
-  local function fetch_issues(page)
-    local ok, res = false, nil
-    local mode = signal.mode:get_value()
+  -- Guards against overlapping list fetches (e.g. mashing refresh/page keys)
+  -- now that requests are non-blocking.
+  local loading = false
+
+  ---@param page number
+  ---@param cb fun(ok: boolean, res: table|nil)
+  local function fetch_issues(page, cb)
+    local mode = get_current_filter()
     if mode == 'all' then
-      ok, res = state.api:get_issues(options.limit, page)
+      state.api:get_issues(options.limit, page, cb)
     elseif mode == 'monitored' then
-      ok, res = state.api:get_monitored_issues(options.limit, page)
+      state.api:get_monitored_issues(options.limit, page, cb)
     elseif mode == 'assigned' then
-      ok, res = state.api:get_assigned_issues(options.limit, page)
+      state.api:get_assigned_issues(options.limit, page, cb)
     elseif mode == 'unassigned' then
-      ok, res = state.api:get_unassigned_issues(options.limit, page)
+      state.api:get_unassigned_issues(options.limit, page, cb)
     elseif mode == 'reported' then
-      ok, res = state.api:get_reported_issues(options.limit, page)
+      state.api:get_reported_issues(options.limit, page, cb)
+    else
+      cb(false, nil)
     end
-    return ok, res
   end
 
   local function load_issues(show_loading)
-    local ok, res
+    if loading then return end
+    loading = true
     if show_loading then
-      ok, res = util.with_loading("Loading issues", function()
-        return fetch_issues(state.page)
-      end)
-    else
-      ok, res = fetch_issues(state.page)
+      vim.notify("Loading issues...", vim.log.levels.INFO)
     end
-    if ok and res and res.issues then
-      issues_cache = res.issues
-      build_signal_nodes()
-    end
-  end
-
-  local function update_issue(issue_id, issue_data)
-    local ok, res = state.api:update_issue(issue_id, issue_data)
-    if ok and res and #res.issues > 0 then
-      update_cache_issue(res.issues[1])
-    end
-  end
-
-  local function update_issue_options(issue, property_name, property_options)
-    local options_to_show = property_options
-    local prompt_opts = {
-      prompt = "Select a " .. property_name,
-      format_item = function(item)
-        return item.name
-      end,
-    }
-
-    if property_name == 'category' then
-      local ok, categories = state.get_project_categories(issue.project.id)
-      if not ok then
-        return
-      end
-      options_to_show = categories
-      prompt_opts.format_item = function(item)
-        return item.name
-      end
-    end
-
-    vim.ui.select(options_to_show, prompt_opts, function(choice)
-      if not choice then
-        return
-      end
-
-      local choice_name = (type(choice) == "table") and choice.name or choice
-      local data = {}
-      data[property_name] = { name = choice_name }
-
-      if property_name == 'status' and (choice.name == 'resolved' or choice.name == 'closed') then
-        vim.ui.select(config.options.issue_resolution_options, {
-          prompt = "Select a resolution",
-          format_item = function(item)
-            return item.name
-          end,
-        }, function(resolution_choice)
-          if not resolution_choice then
-            return
-          end
-          data['resolution'] = { id = resolution_choice.id }
-          update_issue(issue.id, data)
-        end)
-      else
-        update_issue(issue.id, data)
+    fetch_issues(state.page, function(ok, res)
+      loading = false
+      if ok and res and res.issues then
+        issues_cache = res.issues
+        refresh_list()
+        reset_tree_focus()
       end
     end)
   end
 
-  local function add_note(issue_id)
-    ui.add_note(issue_id, function()
-      local ok, res = state.api:get_issue(issue_id)
-      if ok and res and res.issues and res.issues[1] then
+  -- Silent background refresh for the auto-refresh timer. Unlike load_issues it
+  -- does NOT snap focus to the top: it restores the cursor row (clamped) so an
+  -- interval refresh doesn't yank the user around. Selections live in `state`
+  -- by id, so they survive the rebuild.
+  local function auto_refresh()
+    if loading then return end
+    loading = true
+    fetch_issues(state.page, function(ok, res)
+      loading = false
+      if not (ok and res and res.issues) then return end
+      issues_cache = res.issues
+      local row
+      if window and window.winid and vim.api.nvim_win_is_valid(window.winid) then
+        row = vim.api.nvim_win_get_cursor(window.winid)[1]
+      end
+      refresh_list()
+      if row and window and window.winid and vim.api.nvim_win_is_valid(window.winid) then
+        local total = vim.api.nvim_buf_line_count(window.bufnr)
+        pcall(vim.api.nvim_win_set_cursor, window.winid, { math.max(1, math.min(row, total)), 0 })
+        update_selection_indicator()
+      end
+    end)
+  end
+
+  -- Mirror the user's server-side monitored issues into local state so the
+  -- list view can show an indicator. Fetched in the background; re-renders
+  -- once resolved.
+  local function load_monitored_set()
+    state.api:get_monitored_issues(1000, 1, function(ok, res)
+      if not ok or not res or not res.issues then return end
+      local ids = {}
+      for _, issue in ipairs(res.issues) do
+        table.insert(ids, issue.id)
+      end
+      state.set_monitored_ids(ids)
+      refresh_list()
+    end)
+  end
+
+  local function update_issue(issue_id, issue_data)
+    state.api:update_issue(issue_id, issue_data, function(ok, res)
+      if ok and res and res.issues and #res.issues > 0 then
         update_cache_issue(res.issues[1])
       end
     end)
   end
 
-  local function create_issue()
-    local ok, res = state.api:get_all_projects()
-    if not ok or #res.projects == 0 then
-      return
-    end
-    local projects = res.projects
-    vim.ui.select(projects, {
-        prompt = "Select a project",
+  local function update_issue_options(issue, property_name, property_options)
+    local function show_select(options_to_show)
+      vim.ui.select(options_to_show, {
+        prompt = "Select a " .. property_name,
         format_item = function(item)
           return item.name
+        end,
+      }, function(choice)
+        if not choice then
+          return
         end
-      },
-      function(choice)
-        if not choice then return end
-        ui.create_issue(choice.id)
-        renderer:close()
+
+        local choice_name = (type(choice) == "table") and choice.name or choice
+        local data = {}
+        data[property_name] = { name = choice_name }
+
+        if property_name == 'status' and (choice.name == 'resolved' or choice.name == 'closed') then
+          vim.ui.select(config.options.issue_resolution_options, {
+            prompt = "Select a resolution",
+            format_item = function(item)
+              return item.name
+            end,
+          }, function(resolution_choice)
+            if not resolution_choice then
+              return
+            end
+            data['resolution'] = { id = resolution_choice.id }
+            update_issue(issue.id, data)
+          end)
+        else
+          update_issue(issue.id, data)
+        end
+      end)
+    end
+
+    if property_name == 'category' then
+      state.get_project_categories(issue.project.id, function(ok, categories)
+        if not ok then
+          return
+        end
+        show_select(categories)
+      end)
+    else
+      show_select(property_options)
+    end
+  end
+
+  local function add_note(issue_id)
+    ui.add_note(issue_id, function()
+      state.api:get_issue(issue_id, function(ok, res)
+        if ok and res and res.issues and res.issues[1] then
+          update_cache_issue(res.issues[1])
+        end
+      end)
+    end)
+  end
+
+  local function create_issue()
+    state.api:get_all_projects(function(ok, res)
+      if not ok or not res or not res.projects or #res.projects == 0 then
+        return
       end
-    )
+      local projects = res.projects
+      vim.ui.select(projects, {
+          prompt = "Select a project",
+          format_item = function(item)
+            return item.name
+          end
+        },
+        function(choice)
+          if not choice then return end
+          ui.create_issue(choice.id)
+          window:unmount()
+        end
+      )
+    end)
   end
 
   local function change_page(direction)
+    if loading then return end
     local new_page = state.page + direction
     if new_page <= 0 then
       return
     end
 
-    local ok, res = util.with_loading("Loading page " .. new_page, function()
-      return fetch_issues(new_page)
+    loading = true
+    vim.notify("Loading page " .. new_page .. "...", vim.log.levels.INFO)
+    fetch_issues(new_page, function(ok, res)
+      loading = false
+      if ok and res and res.issues and #res.issues > 0 then
+        state.page = new_page
+        state.clear_selection() -- Clear selection on page change
+        issues_cache = res.issues
+        refresh_list()
+        reset_tree_focus()
+      else
+        vim.notify("No more issues on the next page.", vim.log.levels.INFO)
+      end
     end)
-    if ok and res and res.issues and #res.issues > 0 then
-      state.page = new_page
-      state.clear_selection() -- Clear selection on page change
-      issues_cache = res.issues
-      build_signal_nodes()
-    else
-      vim.notify("No more issues on the next page.", vim.log.levels.INFO)
-    end
   end
 
   -- Selection functions
   local function toggle_select()
-    local issue = signal.selected:get_value()
-    if not issue then
-      vim.notify("No issue selected.", vim.log.levels.WARN)
-      return
-    end
+    local issue = get_selected_issue()
+    if not issue then return end
     state.toggle_selection(issue.id)
-    build_signal_nodes()
+    refresh_list()
   end
 
   local function select_all_issues()
     for _, issue in ipairs(issues_cache) do
       state.selected_issues[issue.id] = true
     end
-    build_signal_nodes()
+    refresh_list()
     vim.notify("Selected " .. #issues_cache .. " issues.", vim.log.levels.INFO)
   end
 
   local function clear_selection()
     state.clear_selection()
-    build_signal_nodes()
+    refresh_list()
     vim.notify("Selection cleared.", vim.log.levels.INFO)
   end
 
@@ -246,36 +443,55 @@ function M.render()
     return true, project_id
   end
 
-  -- Batch operation helper
+  -- Batch operation helper. Fires all updates concurrently and finalizes once
+  -- every dispatched request has reported back. Because async callbacks are
+  -- deferred to the main loop, no callback can fire before the dispatch loop
+  -- finishes, so `pending` is fully counted before the first decrement.
   local function batch_update(selected_issues, data_fn, on_complete)
     local success_count = 0
     local fail_count = 0
     local total = #selected_issues
+    local pending = 0
+    local dispatched = 0
 
-    for i, issue in ipairs(selected_issues) do
-      local issue_data = data_fn(issue)
-      if issue_data then
-        local ok, res = state.api:update_issue(issue.id, issue_data)
-        if ok and res and #res.issues > 0 then
-          update_cache_issue(res.issues[1])
-          success_count = success_count + 1
-        else
-          fail_count = fail_count + 1
-        end
+    local function finalize()
+      state.clear_selection()
+      refresh_list()
+
+      if fail_count > 0 then
+        vim.notify(string.format("Updated %d/%d issues (%d failed)", success_count, total, fail_count), vim.log.levels.WARN)
+      else
+        vim.notify(string.format("Updated %d issues", success_count), vim.log.levels.INFO)
+      end
+
+      if on_complete then
+        on_complete()
       end
     end
 
-    state.clear_selection()
-    build_signal_nodes()
-
-    if fail_count > 0 then
-      vim.notify(string.format("Updated %d/%d issues (%d failed)", success_count, total, fail_count), vim.log.levels.WARN)
-    else
-      vim.notify(string.format("Updated %d issues", success_count), vim.log.levels.INFO)
+    for _, issue in ipairs(selected_issues) do
+      local issue_data = data_fn(issue)
+      if issue_data then
+        pending = pending + 1
+        dispatched = dispatched + 1
+        state.api:update_issue(issue.id, issue_data, function(ok, res)
+          if ok and res and res.issues and #res.issues > 0 then
+            update_cache_issue(res.issues[1])
+            success_count = success_count + 1
+          else
+            fail_count = fail_count + 1
+          end
+          pending = pending - 1
+          if pending == 0 then
+            finalize()
+          end
+        end)
+      end
     end
 
-    if on_complete then
-      on_complete()
+    -- All data_fn calls returned nil (nothing to do): still clean up.
+    if dispatched == 0 then
+      finalize()
     end
   end
 
@@ -378,20 +594,21 @@ function M.render()
       return
     end
 
-    local ok, categories = state.get_project_categories(project_id)
-    if not ok then
-      vim.notify("Failed to load categories.", vim.log.levels.ERROR)
-      return
-    end
+    state.get_project_categories(project_id, function(ok, categories)
+      if not ok then
+        vim.notify("Failed to load categories.", vim.log.levels.ERROR)
+        return
+      end
 
-    vim.ui.select(categories, {
-      prompt = string.format("Change category for %d issues", count),
-      format_item = function(item) return item.name end,
-    }, function(choice)
-      if not choice then return end
+      vim.ui.select(categories, {
+        prompt = string.format("Change category for %d issues", count),
+        format_item = function(item) return item.name end,
+      }, function(choice)
+        if not choice then return end
 
-      batch_update(selected_issues, function(issue)
-        return { category = { name = choice.name } }
+        batch_update(selected_issues, function(issue)
+          return { category = { name = choice.name } }
+        end)
       end)
     end)
   end
@@ -411,20 +628,28 @@ function M.render()
       return
     end
 
-    local ok, users = state.get_project_users(project_id)
-    if not ok then
-      vim.notify("Failed to load users.", vim.log.levels.ERROR)
-      return
-    end
+    state.get_project_users(project_id, function(ok, users)
+      if not ok or vim.tbl_isempty(users) then
+        -- Host doesn't support listing project users; prompt for a
+        -- username to assign to all selected issues instead.
+        vim.ui.input({ prompt = string.format("Assign username to %d issues: ", count) }, function(name)
+          if not name or name == "" then return end
+          batch_update(selected_issues, function(issue)
+            return { handler = { name = name } }
+          end)
+        end)
+        return
+      end
 
-    vim.ui.select(users, {
-      prompt = string.format("Assign user to %d issues", count),
-      format_item = function(item) return item.name end,
-    }, function(choice)
-      if not choice then return end
+      vim.ui.select(users, {
+        prompt = string.format("Assign user to %d issues", count),
+        format_item = function(item) return item.name end,
+      }, function(choice)
+        if not choice then return end
 
-      batch_update(selected_issues, function(issue)
-        return { handler = { name = choice.name } }
+        batch_update(selected_issues, function(issue)
+          return { handler = { name = choice.name } }
+        end)
       end)
     end)
   end
@@ -453,24 +678,33 @@ function M.render()
 
       local success_count = 0
       local fail_count = 0
+      local pending = 0
 
-      for _, issue in ipairs(selected_issues) do
-        local ok, _ = state.api:delete_issue(issue.id)
-        if ok then
-          remove_cache_issue(issue.id)
-          success_count = success_count + 1
+      local function finalize()
+        state.clear_selection()
+        refresh_list()
+
+        if fail_count > 0 then
+          vim.notify(string.format("Deleted %d/%d issues (%d failed)", success_count, count, fail_count), vim.log.levels.WARN)
         else
-          fail_count = fail_count + 1
+          vim.notify(string.format("Deleted %d issues", success_count), vim.log.levels.INFO)
         end
       end
 
-      state.clear_selection()
-      build_signal_nodes()
-
-      if fail_count > 0 then
-        vim.notify(string.format("Deleted %d/%d issues (%d failed)", success_count, count, fail_count), vim.log.levels.WARN)
-      else
-        vim.notify(string.format("Deleted %d issues", success_count), vim.log.levels.INFO)
+      for _, issue in ipairs(selected_issues) do
+        pending = pending + 1
+        state.api:delete_issue(issue.id, function(ok)
+          if ok then
+            remove_cache_issue(issue.id)
+            success_count = success_count + 1
+          else
+            fail_count = fail_count + 1
+          end
+          pending = pending - 1
+          if pending == 0 then
+            finalize()
+          end
+        end)
       end
     end)
   end
@@ -479,13 +713,14 @@ function M.render()
     vim.ui.input({ prompt = 'Are you sure you want to delete issue #' .. issue_id .. '? (y/n) ', default = 'n' },
       function(input)
         if input and input:lower() == 'y' then
-          local ok, _ = state.api:delete_issue(issue_id)
-          if ok then
-            vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
-            remove_cache_issue(issue_id)
-          else
-            vim.notify('Failed to delete issue #' .. issue_id, vim.log.levels.ERROR)
-          end
+          state.api:delete_issue(issue_id, function(ok)
+            if ok then
+              vim.notify('Issue #' .. issue_id .. ' deleted.', vim.log.levels.INFO)
+              remove_cache_issue(issue_id)
+            else
+              vim.notify('Failed to delete issue #' .. issue_id, vim.log.levels.ERROR)
+            end
+          end)
         else
           vim.notify('Deletion cancelled.', vim.log.levels.INFO)
         end
@@ -500,36 +735,86 @@ function M.render()
         return
       end
 
-      signal.mode = choice
       state.current_filter = choice
-      load_issues(false)
+      state.page = 1            -- new filter starts from the first page
+      state.clear_selection()   -- selections from the previous filter no longer apply
+      load_issues(true)
+    end)
+  end
+
+  -- Fallback for MantisBT instances that don't expose the
+  -- `projects/{id}/users` REST route (added in 2.25.0): prompt for a
+  -- username to assign as the handler.
+  local function assign_user_by_name(issue_id)
+    vim.ui.input({ prompt = "Assign username (handler): " }, function(name)
+      if not name or name == "" then
+        return
+      end
+      update_issue(issue_id, { handler = { name = name } })
     end)
   end
 
   local function assign_user(project_id, issue_id)
-    local ok, users = state.get_project_users(project_id)
-    if not ok then
-      return
-    end
-
-    vim.ui.select(users, {
-      prompt = "Select a user to assign",
-      format_item = function(item)
-        return item.name
-      end,
-    }, function(choice)
-      if not choice then
+    state.get_project_users(project_id, function(ok, users)
+      if not ok or vim.tbl_isempty(users) then
+        -- The host doesn't support listing project users; fall back to
+        -- entering the username manually so assignment still works.
+        assign_user_by_name(issue_id)
         return
       end
 
-      local data = {
-        handler = { name = choice.name }
-      }
-      local res_ok, res = state.api:update_issue(issue_id, data)
-      if res_ok and res and #res.issues > 0 then
-        update_cache_issue(res.issues[1])
+      vim.ui.select(users, {
+        prompt = "Select a user to assign",
+        format_item = function(item)
+          return item.name
+        end,
+      }, function(choice)
+        if not choice then
+          return
+        end
+
+        update_issue(issue_id, { handler = { name = choice.name } })
+      end)
+    end)
+  end
+
+  local function monitor_issue(issue_id)
+    state.api:monitor_issue(issue_id, function(ok)
+      if ok then
+        state.set_monitored(issue_id, true)
+        refresh_list()
+        vim.notify("Now monitoring issue #" .. issue_id, vim.log.levels.INFO)
+      else
+        vim.notify("Failed to monitor issue #" .. issue_id, vim.log.levels.ERROR)
       end
     end)
+  end
+
+  local function unmonitor_issue(issue_id)
+    state.get_current_user_id(function(user_id)
+      if not user_id then
+        vim.notify("Could not resolve current user to unmonitor issue.", vim.log.levels.ERROR)
+        return
+      end
+      state.api:unmonitor_issue(issue_id, user_id, function(ok)
+        if ok then
+          state.set_monitored(issue_id, false)
+          refresh_list()
+          vim.notify("Stopped monitoring issue #" .. issue_id, vim.log.levels.INFO)
+        else
+          vim.notify("Failed to unmonitor issue #" .. issue_id, vim.log.levels.ERROR)
+        end
+      end)
+    end)
+  end
+
+  -- Toggle monitor state for an issue based on the locally-tracked set.
+  local function toggle_monitor_issue(issue_id)
+    if state.is_monitored(issue_id) then
+      unmonitor_issue(issue_id)
+    else
+      monitor_issue(issue_id)
+    end
   end
 
   local function change_summary(issue_id, summary)
@@ -538,223 +823,235 @@ function M.render()
       return
     end
 
-    local data = {
-      summary = new_summary
-    }
-    local ok, res = state.api:update_issue(issue_id, data)
-    if ok and res and #res.issues > 0 then
-      update_cache_issue(res.issues[1])
-    end
+    update_issue(issue_id, { summary = new_summary })
   end
 
-  local function get_selected_issue()
-    local issue = signal.selected:get_value()
-    if not issue then
+  get_selected_issue = function()
+    local node = current_node()
+    if not node or node.type ~= 'issue' then
       vim.notify('No issue selected.', vim.log.levels.ERROR)
       return
     end
-    return issue
+    return node.issue
   end
 
-  local body = function()
-    local issue_table
-    local current_node_type = nil  -- Track current node type for highlighting
-    local api_name = (state.api.name and state.api.name) or state.api.url
-
-    issue_table = n.tree({
-      flex = 1,
-      autofocus = true,
-      border_label = "MantisBT Issues [" .. api_name .. "]",
-      data = signal.issue_nodes,
-      on_select = function(node, component)
-        if node.type == 'project' then
-          local project_id = node.project.id
-          local collapsed = false
-          for i, id in ipairs(state.collapsed_projects) do
-            if id == project_id then
-              table.remove(state.collapsed_projects, i)
-              collapsed = true
-              break
-            end
-          end
-          if not collapsed then
-            table.insert(state.collapsed_projects, project_id)
-          end
-          build_signal_nodes()
-        elseif node.type == 'issue' then
-          ui.view_issue(node.issue.id)
+  -- <CR> on a row: open an issue, or collapse/expand a project header.
+  local function on_select()
+    local node = current_node()
+    if not node then return end
+    if node.type == 'project' then
+      local project_id = node.project.id
+      local collapsed = false
+      for i, id in ipairs(state.collapsed_projects) do
+        if id == project_id then
+          table.remove(state.collapsed_projects, i)
+          collapsed = true
+          break
         end
-      end,
-      prepare_node = helper.prepare_node,
-      on_change = function(node, component)
-        current_node_type = node and node.type or nil
-        if node and node.type == 'issue' then
-          signal.selected = node.issue
-        end
-      end,
-      on_mount = function(component)
-        local keymap = options.keymap
-        component:set_border_text("bottom", " " .. keymap.help .. " help ", "right")
-
-        local bufnr = component.bufnr
-        local ns_id = vim.api.nvim_create_namespace("mantis_selection")
-        vim.api.nvim_set_hl(0, "MantisSelection", { bg = "#1e1e2a" })
-
-        local function update_selection_indicator()
-          vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
-          if current_node_type == 'issue' then
-            local cursor = vim.api.nvim_win_get_cursor(0)
-            local line = cursor[1] - 1
-            vim.api.nvim_buf_set_extmark(bufnr, ns_id, line, 0, {
-              line_hl_group = "MantisSelection",
-            })
-          end
-        end
-
-        update_selection_indicator()
-        vim.api.nvim_create_autocmd("CursorMoved", {
-          buffer = bufnr,
-          callback = update_selection_indicator,
-        })
-
-        vim.keymap.set("n", keymap.create_issue, function()
-          create_issue()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.add_note, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          add_note(issue.id)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.open_issue, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          local url = string.format("%s/view.php?id=%d", state.api.url, issue.id)
-          util.open_url(url)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.change_status, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          update_issue_options(issue, 'status', config.options.issue_status_options)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.change_priority, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          update_issue_options(issue, 'priority', config.options.issue_priority_options)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.change_severity, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          update_issue_options(issue, 'severity', config.options.issue_severity_options)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.change_category, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          update_issue_options(issue, 'category', nil)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.change_summary, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          change_summary(issue.id, issue.summary)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.assign_issue, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          assign_user(issue.project.id, issue.id)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.filter, function()
-          filter_view()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.delete_issue, function()
-          local issue = get_selected_issue()
-          if not issue then return end
-          delete_issue(issue.id)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.help, function()
-          local view_help = require("mantis.view_help")
-          view_help.render()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.toggle_group, function()
-          signal.grouped = not signal.grouped:get_value()
-          state.grouped = signal.grouped:get_value()
-          build_signal_nodes()
-          local status = signal.grouped:get_value() and "on" or "off"
-          vim.notify("Group by project: " .. status, vim.log.levels.INFO)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.refresh, function()
-          load_issues(true)
-          vim.notify("Issues refreshed.", vim.log.levels.INFO)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.prev_page, function()
-          change_page(-1)
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.next_page, function()
-          change_page(1)
-        end, { buffer = true, nowait = true })
-
-        -- Selection keybindings
-        vim.keymap.set("n", keymap.toggle_select, function()
-          toggle_select()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.select_all, function()
-          select_all_issues()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.clear_selection, function()
-          clear_selection()
-        end, { buffer = true, nowait = true })
-
-        -- Batch operation keybindings
-        vim.keymap.set("n", keymap.batch_status, function()
-          batch_change_status()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.batch_priority, function()
-          batch_change_priority()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.batch_severity, function()
-          batch_change_severity()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.batch_category, function()
-          batch_change_category()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.batch_assign, function()
-          batch_assign_user()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set("n", keymap.batch_delete, function()
-          batch_delete()
-        end, { buffer = true, nowait = true })
-
-        vim.keymap.set({ "n", "i" }, keymap.quit, function()
-          renderer:close()
-        end, { buffer = true, nowait = true })
-      end,
-    })
-
-    return issue_table
+      end
+      if not collapsed then
+        table.insert(state.collapsed_projects, project_id)
+      end
+      refresh_list()
+    elseif node.type == 'issue' then
+      ui.view_issue(node.issue.id)
+    end
   end
 
-  load_issues(false)  -- no loading indicator on initial load
-  renderer:render(body)
+  -- Build the window + tree.
+  local api_name = state.api.name or state.api.url
+  window = create_window(options, api_name)
+  window:mount()
+  active_window = window
+
+  -- Record the real text width of the panel so column sizing fills it exactly.
+  state.list_width = vim.api.nvim_win_get_width(window.winid)
+
+  ensure_hl()
+
+  tree = NuiTree({
+    bufnr = window.bufnr,
+    ns_id = tree_ns,
+    get_node_id = function(node)
+      if node.type == 'issue' then return 'issue-' .. node.issue.id end
+      if node.type == 'project' then return 'project-' .. node.project.id end
+      return 'empty'
+    end,
+    prepare_node = function(node)
+      -- helper.prepare_node appends to a fresh NuiLine and returns it; the
+      -- third (component) arg is unused.
+      return helper.prepare_node(node, NuiLine())
+    end,
+    nodes = helper.build_nodes(issues_cache, state.grouped),
+  })
+  tree:render()
+  update_selection_indicator()
+
+  -- Keymaps (buffer-local to the list).
+  local function map(lhs, fn)
+    vim.keymap.set("n", lhs, fn, { buffer = window.bufnr, nowait = true, silent = true })
+  end
+
+  map("<CR>", on_select)
+
+  map(keymap.create_issue, create_issue)
+  map(keymap.add_note, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    add_note(issue.id)
+  end)
+  map(keymap.open_issue, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    local url = string.format("%s/view.php?id=%d", state.api.url, issue.id)
+    util.open_url(url)
+  end)
+  map(keymap.change_status, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    update_issue_options(issue, 'status', config.options.issue_status_options)
+  end)
+  map(keymap.change_priority, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    update_issue_options(issue, 'priority', config.options.issue_priority_options)
+  end)
+  map(keymap.change_severity, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    update_issue_options(issue, 'severity', config.options.issue_severity_options)
+  end)
+  map(keymap.change_category, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    update_issue_options(issue, 'category', nil)
+  end)
+  map(keymap.change_summary, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    change_summary(issue.id, issue.summary)
+  end)
+  map(keymap.assign_issue, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    assign_user(issue.project.id, issue.id)
+  end)
+  map(keymap.monitor, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    toggle_monitor_issue(issue.id)
+  end)
+  map(keymap.filter, filter_view)
+  map(keymap.delete_issue, function()
+    local issue = get_selected_issue()
+    if not issue then return end
+    delete_issue(issue.id)
+  end)
+  map(keymap.help, function()
+    require("mantis.view_help").render()
+  end)
+  map(keymap.toggle_group, function()
+    state.grouped = not state.grouped
+    refresh_list()
+    vim.notify("Group by project: " .. (state.grouped and "on" or "off"), vim.log.levels.INFO)
+  end)
+  map(keymap.toggle_layout, function()
+    state.layout = (get_current_layout() == 'split') and 'float' or 'split'
+    window:unmount()
+    M.render()
+    vim.notify("Layout: " .. state.layout, vim.log.levels.INFO)
+  end)
+  map(keymap.refresh, function()
+    load_issues(true)
+    vim.notify("Issues refreshed.", vim.log.levels.INFO)
+  end)
+  map(keymap.prev_page, function() change_page(-1) end)
+  map(keymap.next_page, function() change_page(1) end)
+
+  -- Selection
+  map(keymap.toggle_select, toggle_select)
+  map(keymap.select_all, select_all_issues)
+  map(keymap.clear_selection, clear_selection)
+
+  -- Batch operations
+  map(keymap.batch_status, batch_change_status)
+  map(keymap.batch_priority, batch_change_priority)
+  map(keymap.batch_severity, batch_change_severity)
+  map(keymap.batch_category, batch_change_category)
+  map(keymap.batch_assign, batch_assign_user)
+  map(keymap.batch_delete, batch_delete)
+
+  map(keymap.quit, function() window:unmount() end)
+  map("<Esc>", function() window:unmount() end)
+
+  -- Keep the row highlight in sync with cursor movement and the theme.
+  vim.api.nvim_create_autocmd("CursorMoved", {
+    buffer = window.bufnr,
+    callback = update_selection_indicator,
+  })
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    buffer = window.bufnr,
+    callback = function()
+      ensure_hl()
+      update_selection_indicator()
+    end,
+  })
+
+  -- Reflow columns when the editor or this window is resized.
+  local resize_group = vim.api.nvim_create_augroup("MantisViewIssuesResize", { clear = true })
+  vim.api.nvim_create_autocmd({ "VimResized", "WinResized" }, {
+    group = resize_group,
+    callback = function()
+      if window and window.winid and vim.api.nvim_win_is_valid(window.winid) then
+        state.list_width = vim.api.nvim_win_get_width(window.winid)
+        refresh_list()
+      end
+    end,
+  })
+
+  -- Auto-refresh on an interval (config.auto_refresh_interval seconds; 0/false
+  -- disables). The libuv timer is torn down when the list buffer goes away so it
+  -- never fires against a closed window or leaks across reopens.
+  local uv = vim.uv or vim.loop
+  local refresh_timer
+  local function stop_refresh_timer()
+    if refresh_timer then
+      pcall(function()
+        refresh_timer:stop()
+        if not refresh_timer:is_closing() then refresh_timer:close() end
+      end)
+      refresh_timer = nil
+    end
+  end
+
+  local interval = options.auto_refresh_interval
+  if interval and interval > 0 then
+    refresh_timer = uv.new_timer()
+    local ms = math.floor(interval * 1000)
+    refresh_timer:start(ms, ms, vim.schedule_wrap(function()
+      if not (window and window.winid and vim.api.nvim_win_is_valid(window.winid)) then
+        stop_refresh_timer()
+        return
+      end
+      auto_refresh()
+    end))
+  end
+
+  -- Tear down when the list buffer goes away: stop the timer and release the
+  -- single-instance handle so the next open creates a fresh list.
+  vim.api.nvim_create_autocmd({ "BufWipeout", "BufUnload" }, {
+    buffer = window.bufnr,
+    once = true,
+    callback = function()
+      stop_refresh_timer()
+      if active_window == window then
+        active_window = nil
+      end
+    end,
+  })
+
+  load_issues(false)   -- no loading indicator on initial load
+  load_monitored_set() -- background fetch; re-renders the indicator when ready
 end
 
 return M

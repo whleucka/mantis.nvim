@@ -12,7 +12,7 @@ M.options = {
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   create_issue = {
@@ -24,10 +24,13 @@ M.options = {
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   view_issue = {
+    -- Silently re-fetch the open issue on this interval (seconds); 0/false
+    -- disables. Preserves cursor position.
+    auto_refresh_interval = 120,
     ui = {
       width = 80,
       height = 30,
@@ -38,6 +41,7 @@ M.options = {
       quit = "q",
       refresh = "r",
       add_note = "N",
+      delete_note = "dn",
       scroll_down = "j",
       scroll_up = "k",
       page_down = "<C-d>",
@@ -49,6 +53,21 @@ M.options = {
   view_issues = {
     default_filter = 'all', -- default filter: 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
+    -- Silently re-fetch the list on this interval (seconds); 0/false disables.
+    -- Preserves cursor row and selection.
+    auto_refresh_interval = 120,
+    -- Window layout: 'float' (centered popup, default) or 'split' (panel docked
+    -- flush to a screen edge). 'split' is a full-height/width floating panel; it
+    -- overlays rather than reflows other windows.
+    layout = 'float',
+    -- Where the docked panel sits when layout = 'split'.
+    --   'auto'   -> 'right' on landscape screens, 'bottom' on portrait
+    --   'right' | 'left' | 'bottom' -> force a side
+    split_position = 'auto',
+    split_size = 0.30, -- fraction of the screen the panel occupies
+    -- Cell height:width ratio used to infer screen orientation for 'auto'.
+    -- Terminal cells are ~twice as tall as wide; tune for unusual fonts.
+    split_cell_aspect = 2.0,
     ui = {
       -- window size (supports percentages like "90%" or absolute numbers)
       width = "90%",
@@ -79,8 +98,10 @@ M.options = {
       change_severity = "V",
       change_priority = "p",
       change_category = "c",
+      monitor = "m",
       filter = "F",
       toggle_group = "<C-g>",
+      toggle_layout = "<C-s>",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -118,6 +139,8 @@ M.options = {
     normal    = "🔵",
     default   = "🟣" -- if no priority is set
   },
+  -- Indicator shown beside issues the current user is monitoring.
+  monitor_icon = "👀",
 }
 
 function M.setup(options)

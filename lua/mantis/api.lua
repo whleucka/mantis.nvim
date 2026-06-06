@@ -1,31 +1,38 @@
+--- Every method accepts an optional trailing `callback`. When supplied the
+--- call is non-blocking and the result is delivered via `callback(ok, res)` on
+--- the main loop; when omitted the call is synchronous and returns `ok, res`.
+---@alias MantisCallback fun(ok: boolean, res: table|string|nil)
 ---@class MantisAPI
 ---@field url string
 ---@field name string
----@field get_issue fun(self, id: number): table
----@field get_issues fun(self, opts_or_page_size?: table|number, page?: number): table
----@field create_issue fun(self, data: table): table
----@field update_issue fun(self, id: number, data: table): table
----@field delete_issue fun(self, id: number): nil
----@field get_issue_files fun(self, issue_id: number): table
----@field get_issue_file fun(self, issue_id: number, file_id: number): table
----@field get_project_issues fun(self, project_id: number): table
----@field get_project_users fun(self, project_id: number): table
----@field get_project_categories fun(self, project_id: number): table
----@field get_filtered_issues fun(self, filter_id: string|number): table
----@field get_all_issues fun(self): table
----@field get_all_projects fun(self): table
----@field get_assigned_issues fun(self, page_size?: number, page?: number): table
----@field get_reported_issues fun(self, page_size?: number, page?: number): table
----@field get_monitored_issues fun(self, page_size?: number, page?: number): table
----@field get_unassigned_issues fun(self, page_size?: number, page?: number): table
----@field add_attachments_to_issue fun(self, issue_id: number, data: table): table
----@field create_issue_note fun(self, issue_id: number, data: table): table
----@field delete_issue_note fun(self, issue_id: number, note_id: number): nil
----@field monitor_issue fun(self, issue_id: number): table
----@field add_tags_to_issue fun(self, issue_id: number, data: table): table
----@field remove_tags_from_issue fun(self, issue_id: number, tag_id: number): nil
----@field add_issue_relationship fun(self, issue_id: number, data: table): table
----@field get_config fun(self, options: table): table
+---@field get_issue fun(self, id: number, callback?: MantisCallback): boolean?, table?
+---@field get_issues fun(self, opts_or_page_size?: table|number, page?: number, callback?: MantisCallback): boolean?, table?
+---@field create_issue fun(self, data: table, callback?: MantisCallback): boolean?, table?
+---@field update_issue fun(self, id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field delete_issue fun(self, id: number, callback?: MantisCallback): boolean?, table?
+---@field get_issue_files fun(self, issue_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_issue_file fun(self, issue_id: number, file_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_project_issues fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_current_user fun(self, callback?: MantisCallback): boolean?, table?
+---@field get_project_users fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_project_categories fun(self, project_id: number, callback?: MantisCallback): boolean?, table?
+---@field get_filtered_issues fun(self, filter_id: string|number, callback?: MantisCallback): boolean?, table?
+---@field get_all_issues fun(self, callback?: MantisCallback): boolean?, table?
+---@field get_all_projects fun(self, callback?: MantisCallback): boolean?, table?
+---@field get_assigned_issues fun(self, page_size?: number, page?: number, callback?: MantisCallback): boolean?, table?
+---@field get_reported_issues fun(self, page_size?: number, page?: number, callback?: MantisCallback): boolean?, table?
+---@field get_monitored_issues fun(self, page_size?: number, page?: number, callback?: MantisCallback): boolean?, table?
+---@field get_unassigned_issues fun(self, page_size?: number, page?: number, callback?: MantisCallback): boolean?, table?
+---@field add_attachments_to_issue fun(self, issue_id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field create_issue_note fun(self, issue_id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field edit_issue_note fun(self, issue_id: number, note_id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field delete_issue_note fun(self, issue_id: number, note_id: number, callback?: MantisCallback): boolean?, table?
+---@field monitor_issue fun(self, issue_id: number, callback?: MantisCallback): boolean?, table?
+---@field unmonitor_issue fun(self, issue_id: number, user_id: number, callback?: MantisCallback): boolean?, table?
+---@field add_tags_to_issue fun(self, issue_id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field remove_tags_from_issue fun(self, issue_id: number, tag_id: number, callback?: MantisCallback): boolean?, table?
+---@field add_issue_relationship fun(self, issue_id: number, data: table, callback?: MantisCallback): boolean?, table?
+---@field get_config fun(self, options: table, callback?: MantisCallback): boolean?, table?
 
 local M = {}
 
@@ -69,8 +76,70 @@ function M.new(host_config)
   return setmetatable(instance, { __index = M })
 end
 
-function M:call_api(endpoint, method, data)
+-- Curl dispatch table (avoids an if/elseif chain per request)
+local curl_methods = {
+  GET = curl.get,
+  POST = curl.post,
+  PATCH = curl.patch,
+  PUT = curl.put,
+  DELETE = curl.delete,
+}
+
+--- Turn a raw curl response into (ok, result).
+--- Must run on the main loop (calls vim.notify); the async path guarantees
+--- this by wrapping the invocation in vim.schedule.
+---@param response table plenary.curl response
+---@return boolean ok
+---@return table|string|nil result decoded body, or error message on failure
+local function process_response(response)
+  if config.options.debug then
+    print('Mantis API Response:')
+    print('Status: ' .. tostring(response.status))
+    print('Body: ' .. tostring(response.body))
+  end
+
+  if response.status < 200 or response.status >= 300 then
+    local error_message = "Mantis API Error"
+    if response.body and response.body ~= "" then
+      local decode_ok, decoded = pcall(vim.json.decode, response.body)
+      if decode_ok and type(decoded) == "table" and decoded.message then
+        error_message = decoded.message
+      else
+        error_message = response.body
+      end
+    end
+    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
+    return false, error_message
+  end
+
+  if response.body and response.body ~= '' then
+    local decode_ok, decoded = pcall(vim.json.decode, response.body)
+    if decode_ok then
+      return true, decoded
+    else
+      vim.notify('Mantis API Error: Failed to decode response body.', vim.log.levels.ERROR)
+      return false, "Failed to decode response"
+    end
+  end
+
+  return true, nil
+end
+
+--- Perform a request against the MantisBT REST API.
+---
+--- When `callback` is supplied the request is non-blocking: `callback(ok, res)`
+--- is invoked on the main loop once the response arrives (or on error). When it
+--- is omitted the call is synchronous and returns `ok, res` as before.
+---@param endpoint string REST endpoint (relative to /api/rest/)
+---@param method? string HTTP method (default 'GET')
+---@param data? table optional request body (json-encoded)
+---@param callback? fun(ok: boolean, res: table|string|nil) async result handler
+function M:call_api(endpoint, method, data, callback)
   if self.url == nil then
+    if callback then
+      vim.schedule(function() callback(false, "URL not configured") end)
+      return
+    end
     return false, "URL not configured"
   end
 
@@ -88,7 +157,7 @@ function M:call_api(endpoint, method, data)
   }
 
   if data then
-    opts.body = vim.fn.json_encode(data)
+    opts.body = vim.json.encode(data)
   end
 
   if config.options.debug then
@@ -100,59 +169,54 @@ function M:call_api(endpoint, method, data)
     end
   end
 
-  local ok, response = pcall(function()
-    if method == 'GET' then
-      return curl.get(url, opts)
-    elseif method == 'POST' then
-      return curl.post(url, opts)
-    elseif method == 'PATCH' then
-      return curl.patch(url, opts)
-    elseif method == 'DELETE' then
-      return curl.delete(url, opts)
-    else
-      return nil, "Unsupported method " .. method
+  local method_fn = curl_methods[method]
+  if not method_fn then
+    if callback then
+      vim.schedule(function() callback(false, "Unsupported method " .. method) end)
+      return
     end
-  end)
+    return false, "Unsupported method " .. method
+  end
+
+  -- Async path: hand plenary a callback. plenary invokes on_exit/callback from
+  -- a libuv fast-event context, so everything that touches vim.* is deferred to
+  -- the main loop with vim.schedule.
+  if callback then
+    opts.callback = function(response)
+      vim.schedule(function()
+        callback(process_response(response))
+      end)
+    end
+    opts.on_error = function(err)
+      vim.schedule(function()
+        local message = (type(err) == "table" and err.message) or tostring(err)
+        vim.notify('Mantis API Error: ' .. message, vim.log.levels.ERROR)
+        callback(false, message)
+      end)
+    end
+    -- plenary may still raise synchronously while spawning (e.g. curl missing).
+    local spawn_ok, spawn_err = pcall(method_fn, url, opts)
+    if not spawn_ok then
+      vim.schedule(function()
+        vim.notify('Mantis API Error: ' .. tostring(spawn_err), vim.log.levels.ERROR)
+        callback(false, spawn_err)
+      end)
+    end
+    return
+  end
+
+  -- Sync path (blocking): preserved for callers that have not been converted.
+  local ok, response = pcall(method_fn, url, opts)
 
   if not ok then
     vim.notify('Mantis API Error: ' .. tostring(response), vim.log.levels.ERROR)
     return false, response
   end
 
-  if config.options.debug then
-    print('Mantis API Response:')
-    print('Status: ' .. response.status)
-    print('Body: ' .. response.body)
-  end
-
-  if response.status ~= 200 and response.status ~= 201 and response.status ~= 204 then
-    local error_message = "Mantis API Error"
-    if response.body and response.body ~= "" then
-      local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
-      if decode_ok and type(decoded) == "table" and decoded.message then
-        error_message = decoded.message
-      else
-        error_message = response.body
-      end
-    end
-    vim.notify('Mantis API Error: ' .. error_message, vim.log.levels.ERROR)
-    return false, error_message
-  end
-
-  if response.body and response.body ~= '' then
-    local decode_ok, decoded = pcall(vim.fn.json_decode, response.body)
-    if decode_ok then
-      return true, decoded
-    else
-      vim.notify('Mantis API Error: Failed to decode response body.', vim.log.levels.ERROR)
-      return false, "Failed to decode response"
-    end
-  end
-
-  return true, nil
+  return process_response(response)
 end
 
-function M:get_config(options)
+function M:get_config(options, callback)
   local query_params = {}
 
   for _, option in ipairs(options) do
@@ -164,15 +228,15 @@ function M:get_config(options)
   if query_string ~= '' then
     endpoint = endpoint .. '?' .. query_string
   end
-  return self:call_api(endpoint)
+  return self:call_api(endpoint, 'GET', nil, callback)
 end
 
 --- issues
-function M:get_issue(id)
-  return self:call_api('issues/' .. id)
+function M:get_issue(id, callback)
+  return self:call_api('issues/' .. id, 'GET', nil, callback)
 end
 
-function M:get_issues(opts_or_page_size, page)
+function M:get_issues(opts_or_page_size, page, callback)
   local opts
   if type(opts_or_page_size) == 'table' then
     opts = opts_or_page_size
@@ -208,38 +272,53 @@ function M:get_issues(opts_or_page_size, page)
     endpoint = endpoint .. '?' .. query_string
   end
 
-  return self:call_api(endpoint)
+  return self:call_api(endpoint, 'GET', nil, callback)
 end
 
-function M:create_issue(data)
-  return self:call_api('issues', 'POST', data)
+function M:create_issue(data, callback)
+  return self:call_api('issues', 'POST', data, callback)
 end
 
-function M:update_issue(id, data)
-  return self:call_api('issues/' .. id, 'PATCH', data)
+function M:update_issue(id, data, callback)
+  return self:call_api('issues/' .. id, 'PATCH', data, callback)
 end
 
-function M:delete_issue(id)
-  return self:call_api('issues/' .. id, 'DELETE')
+function M:delete_issue(id, callback)
+  return self:call_api('issues/' .. id, 'DELETE', nil, callback)
 end
 
-function M:get_issue_files(issue_id)
-  return self:call_api('issues/' .. issue_id .. '/files', 'GET')
+function M:get_issue_files(issue_id, callback)
+  return self:call_api('issues/' .. issue_id .. '/files', 'GET', nil, callback)
 end
 
-function M:get_issue_file(issue_id, file_id)
-  return self:call_api('issues/' .. issue_id .. '/files/' .. file_id, 'GET')
+function M:get_issue_file(issue_id, file_id, callback)
+  return self:call_api('issues/' .. issue_id .. '/files/' .. file_id, 'GET', nil, callback)
 end
 
-function M:get_project_issues(project_id)
-  return self:get_issues({ project_id = project_id })
+function M:get_project_issues(project_id, callback)
+  return self:get_issues({ project_id = project_id }, nil, callback)
 end
 
-function M:get_project_users(project_id)
-  return self:call_api('projects/' .. project_id .. '/users', 'GET')
+function M:get_current_user(callback)
+  return self:call_api('users/me', 'GET', nil, callback)
 end
 
-function M:get_project_categories(project_id)
+function M:get_project_users(project_id, callback)
+  return self:call_api('projects/' .. project_id .. '/users', 'GET', nil, callback)
+end
+
+function M:get_project_categories(project_id, callback)
+  if callback then
+    self:call_api('projects/' .. project_id, 'GET', nil, function(ok, project)
+      if ok and project and project.projects and project.projects[1] then
+        callback(true, project.projects[1].categories)
+      else
+        callback(false, {})
+      end
+    end)
+    return
+  end
+
   local ok, project = self:call_api('projects/' .. project_id, 'GET')
   if ok and project and project.projects and project.projects[1] then
     return true, project.projects[1].categories
@@ -247,60 +326,103 @@ function M:get_project_categories(project_id)
   return false, {}
 end
 
-function M:get_filtered_issues(filter_id)
-  return self:get_issues({ filter_id = filter_id })
+function M:get_filtered_issues(filter_id, callback)
+  return self:get_issues({ filter_id = filter_id }, nil, callback)
 end
 
-function M:get_all_issues()
-  return self:get_issues()
+function M:get_all_issues(callback)
+  return self:get_issues(nil, nil, callback)
 end
 
-function M:get_all_projects()
-  return self:call_api('projects', 'GET')
+function M:get_all_projects(callback)
+  return self:call_api('projects', 'GET', nil, callback)
 end
 
-function M:get_assigned_issues(page_size, page)
-  return self:get_issues({ filter_id = 'assigned', page_size = page_size, page = page })
+function M:get_assigned_issues(page_size, page, callback)
+  return self:get_issues({ filter_id = 'assigned', page_size = page_size, page = page }, nil, callback)
 end
 
-function M:get_reported_issues(page_size, page)
-  return self:get_issues({ filter_id = 'reported', page_size = page_size, page = page })
+function M:get_reported_issues(page_size, page, callback)
+  return self:get_issues({ filter_id = 'reported', page_size = page_size, page = page }, nil, callback)
 end
 
-function M:get_monitored_issues(page_size, page)
-  return self:get_issues({ filter_id = 'monitored', page_size = page_size, page = page })
+function M:get_monitored_issues(page_size, page, callback)
+  return self:get_issues({ filter_id = 'monitored', page_size = page_size, page = page }, nil, callback)
 end
 
-function M:get_unassigned_issues(page_size, page)
-  return self:get_issues({ filter_id = 'unassigned', page_size = page_size, page = page })
+function M:get_unassigned_issues(page_size, page, callback)
+  return self:get_issues({ filter_id = 'unassigned', page_size = page_size, page = page }, nil, callback)
 end
 
-function M:add_attachments_to_issue(issue_id, data)
-  return self:call_api('issues/' .. issue_id .. '/files', 'POST', data)
+function M:add_attachments_to_issue(issue_id, data, callback)
+  return self:call_api('issues/' .. issue_id .. '/files', 'POST', data, callback)
 end
 
-function M:create_issue_note(issue_id, data)
-  return self:call_api('issues/' .. issue_id .. '/notes', 'POST', data)
+function M:create_issue_note(issue_id, data, callback)
+  return self:call_api('issues/' .. issue_id .. '/notes', 'POST', data, callback)
 end
 
-function M:delete_issue_note(issue_id, note_id)
-  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'DELETE')
+function M:edit_issue_note(issue_id, note_id, data, callback)
+  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'PUT', data, callback)
 end
 
-function M:monitor_issue(issue_id)
-  return self:call_api('issues/' .. issue_id .. '/monitors', 'POST')
+function M:delete_issue_note(issue_id, note_id, callback)
+  return self:call_api('issues/' .. issue_id .. '/notes/' .. note_id, 'DELETE', nil, callback)
 end
 
-function M:add_tags_to_issue(issue_id, data)
-  return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data)
+function M:monitor_issue(issue_id, callback)
+  return self:call_api('issues/' .. issue_id .. '/monitors', 'POST', nil, callback)
 end
 
-function M:remove_tags_from_issue(issue_id, tag_id)
-  return self:call_api('issues/' .. issue_id .. '/tags/' .. tag_id, 'DELETE')
+-- MantisBT (verified on 2.24.4) exposes no DELETE route for issue monitors;
+-- the monitors list can only be replaced via PATCH /issues/{id}. To drop a
+-- single user we fetch the current monitors and PATCH back the remainder,
+-- preserving anyone else monitoring the issue.
+---@param issue_id number
+---@param user_id number user to stop monitoring (typically the current user)
+---@param callback? MantisCallback
+function M:unmonitor_issue(issue_id, user_id, callback)
+  local function remaining_monitors(issue)
+    local monitors = (issue and issue.monitors) or {}
+    local keep = {}
+    for _, m in ipairs(monitors) do
+      if m.id ~= user_id then
+        table.insert(keep, { id = m.id })
+      end
+    end
+    return keep
+  end
+
+  if callback then
+    self:call_api('issues/' .. issue_id, 'GET', nil, function(ok, res)
+      if not ok or not res or not res.issues or not res.issues[1] then
+        callback(false, res)
+        return
+      end
+      self:call_api('issues/' .. issue_id, 'PATCH',
+        { monitors = remaining_monitors(res.issues[1]) }, callback)
+    end)
+    return
+  end
+
+  local ok, res = self:call_api('issues/' .. issue_id, 'GET')
+  if not ok or not res or not res.issues or not res.issues[1] then
+    return false, res
+  end
+  return self:call_api('issues/' .. issue_id, 'PATCH',
+    { monitors = remaining_monitors(res.issues[1]) })
 end
 
-function M:add_issue_relationship(issue_id, data)
-  return self:call_api('issues/' .. issue_id .. '/relationships/', 'POST', data)
+function M:add_tags_to_issue(issue_id, data, callback)
+  return self:call_api('issues/' .. issue_id .. '/tags', 'POST', data, callback)
+end
+
+function M:remove_tags_from_issue(issue_id, tag_id, callback)
+  return self:call_api('issues/' .. issue_id .. '/tags/' .. tag_id, 'DELETE', nil, callback)
+end
+
+function M:add_issue_relationship(issue_id, data, callback)
+  return self:call_api('issues/' .. issue_id .. '/relationships/', 'POST', data, callback)
 end
 
 return M

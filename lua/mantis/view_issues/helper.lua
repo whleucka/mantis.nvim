@@ -6,8 +6,14 @@ local util = require("mantis.util")
 local config = require("mantis.config")
 local options = config.options.view_issues
 
--- Calculate the effective window width from config (handles percentages)
+-- Calculate the effective window width used to size columns. When the list is
+-- open, the renderer records the actual window width in `state.list_width` so
+-- columns fill the real panel (full-width in split mode) rather than the
+-- configured float percentage. Falls back to the config value otherwise.
 local function get_effective_width()
+  if state.list_width then
+    return state.list_width
+  end
   local width = options.ui.width
   if type(width) == "string" and width:match("%%$") then
     local pct = tonumber(width:match("^(%d+)")) or 90
@@ -16,174 +22,47 @@ local function get_effective_width()
   return width or 150
 end
 
--- Calculate summary column width based on available space
+-- Cache for created highlight groups (avoids redundant nvim_set_hl calls)
+local hl_cache = {}
+
+-- Calculate the summary column width so a rendered row fills the panel exactly.
+-- Mirrors the exact cell budget consumed by prepare_node:
+--   checkbox "[ ] " (4) + monitor indicator (icon width + 1) + tree prefix
+--   (4 when grouped, 0 when flat) + each configurable column ("%-Ws " => w + 1,
+--   except `updated` which has no trailing space) + the summary's own trailing
+--   space (1). `get_effective_width()` is the real text width of the window, so
+--   there is no border to account for.
 function M.get_summary_width()
   local columns = options.ui.columns
   local width = get_effective_width()
 
-  -- Fixed overhead: checkbox (4) + tree prefix (4) + border (4) + padding
-  local overhead = 13
+  local monitor_icon = config.options.monitor_icon or ""
+  local monitor_w = math.max(1, vim.fn.strdisplaywidth(monitor_icon)) + 1
 
-  -- Sum of fixed column widths (each has 1 space after)
+  local grouped = state.grouped ~= false
+  local prefix = 4 + monitor_w + (grouped and 4 or 0)
+
   local fixed_width = 0
   for col, w in pairs(columns) do
     if col ~= "summary" and w then
-      fixed_width = fixed_width + w + 1  -- +1 for space after each column
+      -- `updated` is the last column and renders without a trailing space.
+      fixed_width = fixed_width + w + (col == "updated" and 0 or 1)
     end
   end
 
-  -- Remaining space for summary
-  local summary_width = width - overhead - fixed_width
-  -- Clamp between 20 and 99 (Lua format specifier width limit)
-  return math.max(20, math.min(99, summary_width))
-end
-
-function M.get_help()
-  local keymap = options.keymap
-  local COLUMN_GAP = 2
-
-  -- help menu, grouped kinda like neogit
-  local groups = {
-    {
-      title = "Navigation",
-      items = {
-        { key = "next_page",  label = "Next page" },
-        { key = "prev_page",  label = "Prev page" },
-        { key = "open_issue", label = "Open issue" },
-      },
-    },
-    {
-      title = "Issues",
-      items = {
-        { key = "filter",          label = "Filter" },
-        { key = "add_note",        label = "Add note" },
-        { key = "create_issue",    label = "Create issue" },
-        { key = "delete_issue",    label = "Delete issue" },
-        { key = "assign_issue",    label = "Assign issue" },
-        { key = "change_summary",  label = "Change summary" },
-        { key = "change_status",   label = "Change status" },
-        { key = "change_severity", label = "Change severity" },
-        { key = "change_priority", label = "Change priority" },
-        { key = "change_category", label = "Change category" },
-      },
-    },
-    {
-      title = "Selection",
-      items = {
-        { key = "toggle_select",   label = "Toggle select" },
-        { key = "select_all",      label = "Select all" },
-        { key = "clear_selection", label = "Clear selection" },
-      },
-    },
-    {
-      title = "Batch Ops",
-      items = {
-        { key = "batch_status",   label = "Batch status" },
-        { key = "batch_priority", label = "Batch priority" },
-        { key = "batch_severity", label = "Batch severity" },
-        { key = "batch_category", label = "Batch category" },
-        { key = "batch_assign",   label = "Batch assign" },
-        { key = "batch_delete",   label = "Batch delete" },
-      },
-    },
-    {
-      title = "Essential",
-      items = {
-        { key = "toggle_group", label = "Toggle group" },
-        { key = "refresh",      label = "Refresh" },
-        { key = "quit",         label = "Quit" },
-      },
-    },
-  }
-
-  -- resolve key mappings
-  for _, group in ipairs(groups) do
-    local resolved = {}
-    for _, item in ipairs(group.items) do
-      local key = keymap[item.key]
-      if key then
-        table.insert(resolved, {
-          key = key,
-          label = item.label,
-        })
-      end
-    end
-    group.items = resolved
+  -- The priority column holds an emoji that renders ~2 display cells wide while
+  -- the configured column width is typically 1; reserve the extra width so the
+  -- row doesn't overflow the panel by a cell.
+  if columns.priority then
+    local emojis = config.options.priority_emojis or {}
+    local emoji = emojis.normal or ""
+    fixed_width = fixed_width + math.max(0, vim.fn.strdisplaywidth(emoji) - columns.priority)
   end
 
-  -- per-column width calculation (no gap included)
-  for _, group in ipairs(groups) do
-    local key_w   = #group.title
-    local label_w = 0
-
-    for _, item in ipairs(group.items) do
-      key_w   = math.max(key_w, #item.key)
-      label_w = math.max(label_w, #item.label)
-    end
-
-    group.key_width   = key_w
-    group.label_width = label_w
-    group.col_width   = key_w + 1 + label_w
-  end
-
-  -- max rows
-  local max_rows = 0
-  for _, group in ipairs(groups) do
-    max_rows = math.max(max_rows, #group.items)
-  end
-
-  local lines = {}
-
-  local function join_columns(cols)
-    return table.concat(cols, string.rep(" ", COLUMN_GAP))
-  end
-
-  -- header
-  do
-    local header = {}
-    for _, group in ipairs(groups) do
-      table.insert(
-        header,
-        string.format("%-" .. group.col_width .. "s", group.title)
-      )
-    end
-    table.insert(lines, n.line(n.text(join_columns(header), "Special")))
-  end
-
-  -- separator
-  do
-    local sep = {}
-    for _, group in ipairs(groups) do
-      table.insert(sep, string.rep("-", group.col_width))
-    end
-    table.insert(lines, n.line(join_columns(sep)))
-  end
-
-  -- rows
-  for row = 1, max_rows do
-    local cols = {}
-
-    for _, group in ipairs(groups) do
-      local item = group.items[row]
-      if item then
-        table.insert(
-          cols,
-          string.format(
-            "%-" .. group.key_width .. "s %-"
-            .. group.label_width .. "s",
-            item.key,
-            item.label
-          )
-        )
-      else
-        table.insert(cols, string.rep(" ", group.col_width))
-      end
-    end
-
-    table.insert(lines, n.line(join_columns(cols)))
-  end
-
-  return lines
+  -- Reserve the summary's own trailing space ("%-Ws ").
+  local summary_width = width - prefix - fixed_width - 1
+  -- Floor at 20; no upper clamp so the summary flexes to fill wide panels.
+  return math.max(20, summary_width)
 end
 
 function M.prepare_node(node, line, component)
@@ -208,6 +87,16 @@ function M.prepare_node(node, line, component)
     local checkbox_hl = is_selected and "DiagnosticOk" or "Comment"
     line:append(n.text(checkbox, checkbox_hl))
 
+    -- Monitor indicator (config.monitor_icon) shown when the current user is
+    -- monitoring this issue. Pad to the icon's display width, measured at
+    -- render time, so monitored and unmonitored rows stay column-aligned
+    -- regardless of how the terminal sizes the glyph.
+    local monitor_icon = config.options.monitor_icon or ""
+    local icon_width = math.max(1, vim.fn.strdisplaywidth(monitor_icon))
+    local monitor_mark = state.is_monitored(issue.id) and monitor_icon or ""
+    monitor_mark = monitor_mark .. string.rep(" ", icon_width + 1 - vim.fn.strdisplaywidth(monitor_mark))
+    line:append(n.text(monitor_mark, "DiagnosticInfo"))
+
     if node.ungrouped then
       line:append(n.text("", "Comment"))
     elseif node.index == node.count then
@@ -223,9 +112,13 @@ function M.prepare_node(node, line, component)
       status_color = "#808080" -- fallback to gray
     end
     local status_bg = "MantisStatusBg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_bg, { bg = status_color })
     local status_fg = "MantisStatusFg_" .. issue.status.label
-    vim.api.nvim_set_hl(0, status_fg, { fg = status_color })
+    if not hl_cache[status_fg] then
+      vim.api.nvim_set_hl(0, status_bg, { bg = status_color })
+      vim.api.nvim_set_hl(0, status_fg, { fg = status_color })
+      hl_cache[status_bg] = true
+      hl_cache[status_fg] = true
+    end
 
     if columns.priority then
       local priority_emojis = config.options.priority_emojis
@@ -240,8 +133,9 @@ function M.prepare_node(node, line, component)
     end
 
     if columns.id then
-      local id = n.text(string.format("%0" .. columns.id .. "d ", util.truncate(tostring(issue.id), columns.id)),
-        status_fg)
+      -- Zero-pad the numeric id to the column width. Never run it through
+      -- truncate(): that returns "…" past the width and would crash %d.
+      local id = n.text(string.format("%0" .. columns.id .. "d ", issue.id), status_fg)
       line:append(id)
     end
 
@@ -268,10 +162,13 @@ function M.prepare_node(node, line, component)
       line:append(severity)
     end
 
-    -- Summary column uses dynamic width (capped at 99 for Lua format limit)
-    local summary_width = math.min(columns.summary or M.get_summary_width(), 99)
-    local summary = n.text(string.format("%-" .. summary_width .. "s ",
-      util.truncate(issue.summary, summary_width)))
+    -- Summary column uses dynamic width to fill the panel. Pad manually instead
+    -- of string.format("%-Ws") since Lua only accepts a 2-digit width specifier,
+    -- which would cap wide panels at 99 cells and leave the row short.
+    local summary_width = columns.summary or M.get_summary_width()
+    local summary_text = util.truncate(issue.summary, summary_width)
+    local pad = math.max(0, summary_width - vim.fn.strdisplaywidth(summary_text))
+    local summary = n.text(summary_text .. string.rep(" ", pad) .. " ")
     line:append(summary)
 
     if columns.updated then

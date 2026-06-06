@@ -5,24 +5,52 @@ local M = {
   collapsed_projects = {},
   current_filter = nil, -- persists filter across view_issues sessions
   grouped = true, -- persists grouped view across view_issues sessions
+  layout = nil, -- active view_issues layout ('float'|'split'); nil falls back to config
+  list_width = nil, -- actual view_issues window width; drives column sizing
 
   -- Per-project caches (cleared on host switch)
   ---@type table<number, table[]> project_id -> users array
   _users_cache = {},
   ---@type table<number, table[]> project_id -> categories array
   _categories_cache = {},
+  ---@type table|nil authenticated user (from users/me); cleared on host switch
+  _current_user = nil,
 
   -- Selection state for batch operations
   ---@type table<number, boolean> issue_id -> selected
   selected_issues = {},
+
+  -- Issues the current user is monitoring (server-side state mirrored locally
+  -- so the list view can show an indicator). Cleared on host switch.
+  ---@type table<number, boolean> issue_id -> monitored
+  monitored_issues = {},
 }
 
---- Get project users with caching
+--- Get project users with caching.
+--- When `callback` is supplied the fetch is non-blocking and the result is
+--- delivered via `callback(ok, users)`; otherwise it returns `ok, users`.
 ---@param project_id number
+---@param callback? fun(ok: boolean, users: table[]) async result handler
 ---@param force_refresh? boolean
----@return boolean ok
----@return table[] users
-function M.get_project_users(project_id, force_refresh)
+---@return boolean? ok
+---@return table[]? users
+function M.get_project_users(project_id, callback, force_refresh)
+  if callback then
+    if not force_refresh and M._users_cache[project_id] then
+      callback(true, M._users_cache[project_id])
+      return
+    end
+    M.api:get_project_users(project_id, function(ok, res)
+      if ok and res and res.users then
+        M._users_cache[project_id] = res.users
+        callback(true, res.users)
+      else
+        callback(false, {})
+      end
+    end)
+    return
+  end
+
   if not force_refresh and M._users_cache[project_id] then
     return true, M._users_cache[project_id]
   end
@@ -36,12 +64,31 @@ function M.get_project_users(project_id, force_refresh)
   return false, {}
 end
 
---- Get project categories with caching
+--- Get project categories with caching.
+--- When `callback` is supplied the fetch is non-blocking and the result is
+--- delivered via `callback(ok, categories)`; otherwise it returns `ok, categories`.
 ---@param project_id number
+---@param callback? fun(ok: boolean, categories: table[]) async result handler
 ---@param force_refresh? boolean
----@return boolean ok
----@return table[] categories
-function M.get_project_categories(project_id, force_refresh)
+---@return boolean? ok
+---@return table[]? categories
+function M.get_project_categories(project_id, callback, force_refresh)
+  if callback then
+    if not force_refresh and M._categories_cache[project_id] then
+      callback(true, M._categories_cache[project_id])
+      return
+    end
+    M.api:get_project_categories(project_id, function(ok, categories)
+      if ok and categories then
+        M._categories_cache[project_id] = categories
+        callback(true, categories)
+      else
+        callback(false, {})
+      end
+    end)
+    return
+  end
+
   if not force_refresh and M._categories_cache[project_id] then
     return true, M._categories_cache[project_id]
   end
@@ -59,6 +106,27 @@ end
 function M.clear_caches()
   M._users_cache = {}
   M._categories_cache = {}
+  M._current_user = nil
+  M.monitored_issues = {}
+end
+
+--- Get the authenticated user's id (from users/me), cached for the session.
+--- Always async: the result is delivered via `callback(id)` where `id` is the
+--- numeric user id, or `nil` if it could not be resolved.
+---@param callback fun(id: number|nil)
+function M.get_current_user_id(callback)
+  if M._current_user and M._current_user.id then
+    callback(M._current_user.id)
+    return
+  end
+  M.api:get_current_user(function(ok, user)
+    if ok and user and user.id then
+      M._current_user = user
+      callback(user.id)
+    else
+      callback(nil)
+    end
+  end)
 end
 
 --- Toggle selection state for an issue
@@ -101,6 +169,30 @@ function M.get_selected_ids()
     table.insert(ids, id)
   end
   return ids
+end
+
+--- Check if the current user is monitoring an issue
+---@param id number
+---@return boolean
+function M.is_monitored(id)
+  return M.monitored_issues[id] == true
+end
+
+--- Set the monitored state for a single issue
+---@param id number
+---@param monitored boolean
+function M.set_monitored(id, monitored)
+  M.monitored_issues[id] = monitored and true or nil
+end
+
+--- Replace the whole monitored set from a list of issue IDs
+---@param ids number[]
+function M.set_monitored_ids(ids)
+  local set = {}
+  for _, id in ipairs(ids) do
+    set[id] = true
+  end
+  M.monitored_issues = set
 end
 
 return M

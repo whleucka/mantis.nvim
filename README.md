@@ -5,20 +5,27 @@
 ## Features
 
 - Supports multiple MantisBT hosts
-- Fully reactive UI powered by **nui-components**
+- Built with **nui.nvim** and **nui-components**
 - Cross-platform (Linux, macOS, Windows)
 
-### Issues
+### Issues List
 
-- Configurable issue properties
-- Optional pagination for large result sets
+- Open as a centered floating window or a native split panel (`layout`), toggleable at runtime with `<C-s>`
+- Smart split placement: `split_position = 'auto'` docks on the **right** on landscape screens and the **bottom** on portrait
+- Single instance: re-opening the list focuses the existing panel instead of stacking duplicates
+- Auto-refreshes on a configurable interval, preserving your cursor row and selection
+- Configurable issue properties and column widths
+- Pagination for large result sets
+- Filter by all, assigned, reported, monitored, or unassigned issues
 - Assign issues to users
 - Create and delete issues
 - Open issues directly in your browser
-- Update status, priority, severity, and category
+- Update status, priority, severity, category, and summary
 - Add notes to existing issues
-- Toggle grouped/ungrouped view
-- Default filter setting (all, assigned, reported, monitored, unassigned)
+- Monitor/unmonitor issues (monitored issues show a 👁 indicator in the list)
+- Toggle grouped/ungrouped view (group by project)
+- Priority emojis with customizable icons
+- Selection and batch operations
 
 ### Batch Operations
 
@@ -29,14 +36,15 @@
 
 ### Create Issue
 
-- Assign users
-- Set category
+- Assign user
+- Set category, priority, severity, and reproducibility
 - Add summary and description
 
 ### View Issue
 
-- Inspect full issue details
-- Browse issue notes
+- Inspect full issue details including custom fields
+- Browse and add notes with optional time tracking
+- Delete notes
 - Review issue history
 
 ## Requirements
@@ -100,7 +108,7 @@ To use `mantis.nvim`, you need to configure your MantisBT hosts. Each host entry
 ### Getting an API Token
 
 1. Log in to your MantisBT instance
-2. Go to **My Account** → **API Tokens**
+2. Go to **My Account** -> **API Tokens**
 3. Create a new token with appropriate permissions
 4. Copy the token and store it securely
 
@@ -138,7 +146,7 @@ require('mantis').setup({
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   create_issue = {
@@ -150,7 +158,7 @@ require('mantis').setup({
     },
     keymap = {
       quit = "q",
-      submit = "<C-CR>",
+      submit = "<M-CR>",
     }
   },
   view_issue = {
@@ -164,6 +172,7 @@ require('mantis').setup({
       quit = "q",
       refresh = "r",
       add_note = "N",
+      delete_note = "dn",
       scroll_down = "j",
       scroll_up = "k",
       page_down = "<C-d>",
@@ -175,8 +184,21 @@ require('mantis').setup({
   view_issues = {
     default_filter = 'all', -- 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
+    -- Silently re-fetch the list on this interval (seconds); 0/false disables.
+    -- Preserves cursor row and selection.
+    auto_refresh_interval = 120,
+    -- Window layout: 'float' (centered popup) or 'split' (docked panel).
+    layout = 'float',
+    -- Where the docked panel sits when layout = 'split'.
+    --   'auto'  -> 'right' on landscape screens, 'bottom' on portrait
+    --   'right' | 'left' | 'bottom' -> force a side
+    split_position = 'auto',
+    split_size = 0.40, -- fraction of the screen the panel occupies
+    -- Cell height:width ratio used to infer orientation for 'auto'
+    -- (terminal cells are ~twice as tall as wide).
+    split_cell_aspect = 2.0,
     ui = {
-      -- window size (supports percentages like "90%" or absolute numbers)
+      -- window size for the float layout (percentages like "90%" or numbers)
       width = "90%",
       height = "80%",
       max_width = 180,
@@ -205,8 +227,10 @@ require('mantis').setup({
       change_severity = "V",
       change_priority = "p",
       change_category = "c",
+      monitor = "m",
       filter = "F",
       toggle_group = "<C-g>",
+      toggle_layout = "<C-s>",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -223,11 +247,6 @@ require('mantis').setup({
       batch_delete = "bD",
     }
   },
-  issue_status_options = {},
-  issue_severity_options = {},
-  issue_priority_options = {},
-  issue_resolution_options = {},
-  issue_reproducibility_options = {},
   issue_filter_options = {
     'all',
     'assigned',
@@ -244,6 +263,9 @@ require('mantis').setup({
     normal    = "🔵",
     default   = "🟣",
   },
+  -- Indicator shown beside issues you are monitoring. Defaults to the 👁 emoji;
+  -- set a Nerd Font glyph (e.g. "" / nf-fa-eye) if your font renders it better.
+  monitor_icon = "👁️",
 }
 ```
 
@@ -273,8 +295,10 @@ require('mantis').setup({
 | `V` | Change severity |
 | `c` | Change category |
 | `S` | Change summary |
+| `m` | Toggle monitoring an issue (monitored issues show a 👁 indicator) |
 | `F` | Filter issues |
 | `<C-g>` | Toggle group by project |
+| `<C-s>` | Toggle float/split layout |
 | `r` | Refresh |
 | `L` | Next page |
 | `H` | Previous page |
@@ -307,7 +331,22 @@ require('mantis').setup({
 | `<C-d>` / `<C-u>` | Page down/up |
 | `gg` / `G` | Go to top/bottom |
 | `N` | Add note |
+| `dn` | Delete note |
 | `r` | Refresh |
+| `q` | Quit |
+
+### Keymaps (Add Note)
+
+| Key | Action |
+|-----|--------|
+| `<M-CR>` | Submit |
+| `q` | Quit |
+
+### Keymaps (Create Issue)
+
+| Key | Action |
+|-----|--------|
+| `<M-CR>` | Submit |
 | `q` | Quit |
 
 ## Troubleshooting
@@ -334,10 +373,37 @@ nvim
 - If using HTTPS, ensure SSL certificates are valid
 
 ## Screenshots
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/51e1572c-8642-4210-bf91-56c94a3f6029" />
+  <figcaption style="text-align: center;"><strong>View issues (split)</strong></figcaption>
+</figure>
+</div>
+<br><br>
 
-<img width="1740" height="963" alt="image" src="https://github.com/user-attachments/assets/50d83bcb-5e80-4874-b6a6-53d4ce19d4ec" />
-<img width="922" height="696" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
-<img width="894" height="649" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/50d83bcb-5e80-4874-b6a6-53d4ce19d4ec" />
+  <figcaption style="text-align: center"><strong>View issues (float)</strong></figcaption>
+</figure>
+</div>
+<br><br>
+
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/5648de5b-24af-41d3-bcef-3e40384f5960" />
+  <figcaption style="text-align: center"><strong>View issue</strong></figcaption>
+</figure>
+</div>
+<br><br>
+
+<div align="center">
+<figure>
+  <img width="100%" alt="image" src="https://github.com/user-attachments/assets/8d51ae6f-6e0e-4685-b00c-a1751c5873b4" />
+  <figcaption style="text-align: center"><strong>Create issue</strong></figcaption>
+</figure>
+</div>
+
 ## License
 
 MIT

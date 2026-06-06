@@ -29,6 +29,7 @@ local function get_help_groups()
         { key = "change_severity", label = "Change severity" },
         { key = "change_priority", label = "Change priority" },
         { key = "change_category", label = "Change category" },
+        { key = "monitor",         label = "Toggle monitor issue" },
       },
     },
     {
@@ -54,6 +55,7 @@ local function get_help_groups()
       title = "General",
       items = {
         { key = "toggle_group", label = "Toggle grouping" },
+        { key = "toggle_layout", label = "Toggle float/split" },
         { key = "refresh",      label = "Refresh" },
         { key = "help",         label = "Close help" },
         { key = "quit",         label = "Quit" },
@@ -299,13 +301,17 @@ function M.render()
 
   -- Set buffer content then make readonly
   vim.api.nvim_buf_set_lines(popup.bufnr, 0, -1, false, lines)
-  vim.api.nvim_buf_set_option(popup.bufnr, "modifiable", false)
-  vim.api.nvim_buf_set_option(popup.bufnr, "buftype", "nofile")
+  vim.bo[popup.bufnr].modifiable = false
+  vim.bo[popup.bufnr].buftype = "nofile"
 
   -- Apply highlights
   local ns = vim.api.nvim_create_namespace("mantis_help")
   for _, hl in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(popup.bufnr, ns, hl.hl, hl.line - 1, hl.col, hl.end_col)
+    vim.api.nvim_buf_set_extmark(popup.bufnr, ns, hl.line - 1, hl.col, {
+      end_col = hl.end_col,
+      hl_group = hl.hl,
+      strict = false,
+    })
   end
 
   -- Keymaps to close
@@ -317,7 +323,7 @@ function M.render()
   popup:map("n", keymap.help, close, { noremap = true, silent = true })
   popup:map("n", "<Esc>", close, { noremap = true, silent = true })
 
-  popup:on(event.BufLeave, function()
+  popup:on(event.WinClosed, function()
     popup:unmount()
   end)
 end
