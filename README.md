@@ -133,6 +133,8 @@ require('mantis').setup({
     ui = {
       width = 60,
       height = 10,
+      max_width = 80,
+      max_height = 20,
     },
     keymap = {
       quit = "q",
@@ -143,6 +145,8 @@ require('mantis').setup({
     ui = {
       width = 80,
       height = 21,
+      max_width = 120,
+      max_height = 30,
     },
     keymap = {
       quit = "q",
@@ -153,6 +157,8 @@ require('mantis').setup({
     ui = {
       width = 80,
       height = 30,
+      max_width = 120,
+      max_height = 40,
     },
     keymap = {
       quit = "q",
@@ -170,15 +176,19 @@ require('mantis').setup({
     default_filter = 'all', -- 'all', 'assigned', 'reported', 'monitored', 'unassigned'
     limit = 42, -- issues per page
     ui = {
-      width = 150,
-      height = 50,
+      -- window size (supports percentages like "90%" or absolute numbers)
+      width = "90%",
+      height = "80%",
+      max_width = 180,
+      max_height = 50,
+      -- column widths (summary is calculated dynamically to fill remaining space)
       columns = {
         priority = 1,
         id = 7,
         severity = 10,
         status = 24,
         category = 12,
-        summary = 69,
+        summary = nil, -- auto-calculated based on available width
         updated = 10
       }
     },
@@ -192,11 +202,11 @@ require('mantis').setup({
       assign_issue = "a",
       change_summary = "S",
       change_status = "s",
-      change_severity = "v",
+      change_severity = "V",
       change_priority = "p",
       change_category = "c",
-      filter = "f",
-      toggle_group = "g",
+      filter = "F",
+      toggle_group = "<C-g>",
       help = "?",
       refresh = "r",
       quit = "q",
@@ -260,11 +270,11 @@ require('mantis').setup({
 | `a` | Assign issue |
 | `s` | Change status |
 | `p` | Change priority |
-| `v` | Change severity |
+| `V` | Change severity |
 | `c` | Change category |
 | `S` | Change summary |
-| `f` | Filter issues |
-| `g` | Toggle group by project |
+| `F` | Filter issues |
+| `<C-g>` | Toggle group by project |
 | `r` | Refresh |
 | `L` | Next page |
 | `H` | Previous page |
