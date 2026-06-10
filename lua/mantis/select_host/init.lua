@@ -53,7 +53,8 @@ local function is_available(host)
     return true
   end
   if host.env then
-    return os.getenv(host.env) ~= nil
+    local value = os.getenv(host.env)
+    return value ~= nil and value ~= ""
   end
   return false
 end
