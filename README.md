@@ -126,10 +126,19 @@ require('mantis').setup({
       name = "Personal MantisBT",
       url = "https://my.mantisbt.org",
       token = "your-api-token-here", -- Hardcoded token (less secure)
+      default = true, -- Skip host selection and always use this host
     },
   },
 })
 ```
+
+> **`default = true`** — when a host is marked as default, the host selection
+> prompt is skipped and that host is used directly, even if multiple hosts are
+> configured.
+>
+> Hosts that read their token from an environment variable (`env`) are only
+> shown in the selection list when that variable is actually set; otherwise they
+> are silently dropped.
 
 ### Default Configuration
 

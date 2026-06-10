@@ -45,14 +45,42 @@ local function set_host(host, on_complete)
   )
 end
 
+--- A host is selectable if it has a direct token, or its env var is set.
+---@param host table host configuration
+---@return boolean
+local function is_available(host)
+  if host.token then
+    return true
+  end
+  if host.env then
+    return os.getenv(host.env) ~= nil
+  end
+  return false
+end
+
 function M.render(on_complete)
-  local hosts = config.options.hosts
+  -- only consider hosts whose credentials are actually resolvable; a host that
+  -- reads from an unset env var is silently dropped from the list
+  local hosts = vim.tbl_filter(is_available, config.options.hosts)
   local count = vim.tbl_count(hosts)
+
+  if count == 0 then
+    vim.notify("Mantis: No hosts available. Check host tokens / environment variables.", vim.log.levels.ERROR)
+    if on_complete then on_complete() end
+    return
+  end
+
+  -- a host marked default = true skips selection entirely
+  for _, host in ipairs(hosts) do
+    if host.default then
+      set_host(host, on_complete)
+      return
+    end
+  end
 
   -- auto-select if only one host
   if count == 1 then
-    local _, host = next(hosts)
-    set_host(host, on_complete)
+    set_host(hosts[1], on_complete)
     return
   end
 
